@@ -19,6 +19,14 @@
 - [ ] Look-ahead limiting with gain-reduction metering
 - [ ] Listening-test fixtures and reproducible DSP benchmarks
 
+## Phase 5 — Live audition and performance controls
+- [x] Browser-native live playback using Web Audio API
+- [x] Instant listening modes: Studio, Orbit 16D, Wide Field, Bass Focus, Dream Space, Night
+- [x] Live monitor level, seek/pause/resume, bass and treble EQ controls
+- [x] Existing offline conversion/export path remains unchanged
+- [ ] Add live reverb/width processing and compare live chain against offline render
+- [ ] Run frontend CI/typecheck and test on Chromium/Firefox/Safari where available
+
 ## Phase 4 — Distribution
 - [x] PyInstaller onedir packaging specification
 - [x] Windows PowerShell build script
