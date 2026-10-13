@@ -174,7 +174,7 @@ export default function App() {
     } catch (reason) {
       if (reason instanceof DOMException && reason.name === "AbortError") setStatus(`Cancelled · ${newResults.length} file(s) completed`);
       else { setError(reason instanceof Error ? reason.message : "Conversion failed."); setStatus("Batch stopped after an error"); }
-    } finally { abortRef.current = null; setBusy(false); setCancelRequested(false); }
+    } finally { abortRef.current = null; setBusy(false); }
   }
 
   function download(item: Completed) {
