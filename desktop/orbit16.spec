@@ -1,6 +1,7 @@
 # PyInstaller spec for Orbit16 Studio (Windows, onedir).
 from pathlib import Path
 
+# SPECPATH is the desktop/ directory containing this spec file.
 ROOT = Path(SPECPATH).resolve().parent.parent
 datas = [
     (str(ROOT / "frontend" / "dist"), "frontend/dist"),
