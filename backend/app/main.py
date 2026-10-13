@@ -33,6 +33,8 @@ async def convert(
     movement_enabled: Annotated[bool, Form()] = True,
     width_enabled: Annotated[bool, Form()] = True,
     reverb_enabled: Annotated[bool, Form()] = True,
+    bass_gain_db: Annotated[float, Form(ge=-12, le=12)] = 0.0,
+    treble_gain_db: Annotated[float, Form(ge=-12, le=12)] = 0.0,
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
@@ -57,7 +59,7 @@ async def convert(
         audio, sample_rate = read_float_wav(decoded)
         if len(audio) / sample_rate > settings.max_duration_seconds:
             raise HTTPException(status_code=413, detail=f"Maximum audio duration is {settings.max_duration_seconds} seconds.")
-        result = process_audio(audio, sample_rate, movement_depth=movement_depth, movement_rate=movement_rate, stereo_width=stereo_width, reverb_mix=reverb_mix, output_ceiling_db=output_ceiling_db, movement_enabled=movement_enabled, width_enabled=width_enabled, reverb_enabled=reverb_enabled)
+        result = process_audio(audio, sample_rate, movement_depth=movement_depth, movement_rate=movement_rate, stereo_width=stereo_width, reverb_mix=reverb_mix, output_ceiling_db=output_ceiling_db, movement_enabled=movement_enabled, width_enabled=width_enabled, reverb_enabled=reverb_enabled, bass_gain_db=bass_gain_db, treble_gain_db=treble_gain_db)
         write_24bit_wav(output, result, sample_rate)
         logger.info("Converted duration %.2fs at %d Hz (%d input bytes)", len(audio) / sample_rate, sample_rate, total)
         return FileResponse(path=str(output), media_type="audio/wav", filename="orbit16_spatial.wav", background=BackgroundTask(shutil.rmtree, str(job_dir), ignore_errors=True))
