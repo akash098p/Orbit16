@@ -2,7 +2,7 @@
 from pathlib import Path
 
 # SPECPATH is the desktop/ directory containing this spec file.
-ROOT = Path(SPECPATH).resolve().parent.parent
+ROOT = Path(SPECPATH).resolve().parent
 datas = [
     (str(ROOT / "frontend" / "dist"), "frontend/dist"),
     (str(ROOT / "config"), "config"),
