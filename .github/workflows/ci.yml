@@ -37,3 +37,28 @@ jobs:
       - name: Audit built frontend for remote URLs
         working-directory: .
         run: python scripts/audit_offline.py
+
+  windows-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r backend/requirements.txt pyinstaller
+      - run: npm install
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: python scripts/audit_offline.py
+      - run: python -m PyInstaller --noconfirm --clean desktop/orbit16.spec
+      - name: Verify packaged launcher exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/Orbit16Studio/Orbit16Studio.exe")) {
+            throw "PyInstaller did not produce the expected Windows executable."
+          }
