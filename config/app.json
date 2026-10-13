@@ -1,0 +1,1 @@
+{"app_name":"Orbit16 Studio","version":"0.1.0","processing_mode":"offline","default_theme":"dark","default_export":{"format":"wav","subtype":"PCM_24","preserve_source_sample_rate":true},"limits":{"max_upload_mb":150,"max_duration_seconds":600},"audio_defaults":{"movement_depth":0.65,"movement_rate":0.12,"stereo_width":1.2,"reverb_mix":0.12,"output_ceiling_db":-1.0}}
