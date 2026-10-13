@@ -75,11 +75,12 @@ function SourcePreview({ file }: { file: File }) {
 }
 
 type LiveMode = "studio" | "orbit" | "wide" | "bass" | "dream" | "night";
+type LiveExport = { mode: LiveMode; bass: number; treble: number };
 
-function LiveAudition({ file, settings, mode, onModeChange }: { file: File | null; settings: Settings; mode: LiveMode; onModeChange: (mode: LiveMode) => void }) {
+function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { file: File | null; settings: Settings; mode: LiveMode; onModeChange: (mode: LiveMode) => void; onExportChange: (value: LiveExport) => void }) {
   const [volume, setVolume] = useState(0.8);
   const [bass, setBass] = useState(0);
-  const [treble, setTreble] = useState(0);
+  const [treble, setTreble] = useState(0);\n  useEffect(() => { onExportChange({ mode, bass, treble }); }, [mode, bass, treble, onExportChange]);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState(0);
@@ -271,7 +272,7 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
     <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => onModeChange(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
     <div className="live-eq"><div><span>BASS</span><strong>{bass > 0 ? "+" : ""}{bass} dB</strong><input className="range" aria-label="Live bass EQ" type="range" min={-12} max={12} step={1} value={bass} onChange={e => setBass(Number(e.target.value))}/></div><div><span>TREBLE</span><strong>{treble > 0 ? "+" : ""}{treble} dB</strong><input className="range" aria-label="Live treble EQ" type="range" min={-12} max={12} step={1} value={treble} onChange={e => setTreble(Number(e.target.value))}/></div></div>
     <p className="live-message" role="status">{message}</p>
-    <p className="analysis-note">Record the live mix to download the exact sound you hear, including the selected mode and EQ. The browser recording downloads as WebM; the WAV export above uses offline DSP controls.</p>
+    <p className="analysis-note">Studio WAV now applies your selected listening mode and live bass/treble EQ. Use Record Mix only when you want to capture a specific section in real time.</p>
   </section>;
 }
 
@@ -281,7 +282,7 @@ function Control({ title, subtitle, value, label, min, max, step, onChange }: { 
 
 export default function App() {
   const [files, setFiles] = useState<File[]>([]);
-  const [liveMode, setLiveMode] = useState<LiveMode>("orbit");
+  const [liveMode, setLiveMode] = useState<LiveMode>("orbit");\n  const [liveExport, setLiveExport] = useState<LiveExport>({ mode: "orbit", bass: 0, treble: 0 });
   const [settings, setSettings] = useState<Settings>(() => {
     try { return { ...initialSettings, ...JSON.parse(localStorage.getItem("orbit16.settings") || "{}") }; } catch { return initialSettings; }
   });
@@ -368,8 +369,10 @@ export default function App() {
           dream: { movement_depth: Math.min(1, settings.movement_depth * 0.7), movement_rate: Math.max(0.02, settings.movement_rate * 0.7), stereo_width: 1.35, reverb_mix: 0.28 },
           night: { movement_depth: 0.08, movement_rate: 0.06, stereo_width: 1.1, reverb_mix: 0.06 },
         };
-        Object.assign(exportSettings, exportProfiles[liveMode]);
+        Object.assign(exportSettings, exportProfiles[liveExport.mode]);
         Object.entries(exportSettings).forEach(([key, value]) => body.append(key, String(value)));
+        body.append("bass_gain_db", String(liveExport.bass));
+        body.append("treble_gain_db", String(liveExport.treble));
         const response = await fetch("/api/convert", { method: "POST", body, signal: controller.signal });
         if (!response.ok) {
           let message = `Conversion failed (${response.status})`;
@@ -409,7 +412,7 @@ export default function App() {
       <label className={`drop-zone ${files.length ? "has-file" : ""} ${dragging ? "dragging" : ""}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}><input type="file" multiple accept={audioAccept} onChange={choose}/><span className="upload-icon">↑</span><span className="drop-main">{files.length ? "Add more tracks or drop files here" : "Drop tracks here or browse files"}</span><span className="drop-sub">{fileLabel}</span><span className="browse-button">Browse audio</span></label>
       {files.length > 0 && <section className="queue-panel"><div className="queue-head"><strong>Batch queue <span>{files.length}</span></strong><button type="button" className="text-button" onClick={clearQueue} disabled={busy}>Clear queue</button></div><div className="queue-list">{files.map((f, i) => <div className="queue-item" key={`${f.name}-${f.size}-${f.lastModified}`}><span className="queue-number">{String(i + 1).padStart(2, "0")}</span><div className="queue-file"><strong>{f.name}</strong><small>{(f.size / 1024 / 1024).toFixed(2)} MB</small></div><span className="queue-state">{busy && i === currentIndex ? "PROCESSING" : "QUEUED"}</span></div>)}</div></section>}
       <Waveform file={activeFile} label={activeFile ? activeFile.name : "Source waveform"}/>
-      <LiveAudition file={activeFile} settings={settings} mode={liveMode} onModeChange={setLiveMode}/>
+      <LiveAudition file={activeFile} settings={settings} mode={liveMode} onModeChange={setLiveMode} onExportChange={setLiveExport}/>
       {activeFile && <section className="preview-panel"><div><div className="eyebrow">BEFORE / SOURCE</div><h3>Listen to original</h3></div><SourcePreview file={activeFile}/></section>}
       <section className="analysis-panel"><div className="analysis-head"><div><div className="eyebrow">SOURCE DIAGNOSTICS</div><h3>Listen with numbers</h3><p>Integrated loudness, estimated true peak, stereo correlation and mono fold-down compatibility.</p></div><button className="secondary-button" type="button" onClick={analyzeSource} disabled={!activeFile || analyzing}>{analyzing ? "Analysing…" : "Analyse source"}</button></div>{analysis && <div className="metrics-grid"><div className="metric"><span>INTEGRATED LOUDNESS</span><strong>{analysis.metrics.integrated_lufs == null ? "—" : `${analysis.metrics.integrated_lufs.toFixed(1)} LUFS`}</strong></div><div className="metric"><span>EST. TRUE PEAK</span><strong>{analysis.metrics.true_peak_dbtp == null ? "—" : `${analysis.metrics.true_peak_dbtp.toFixed(1)} dBTP`}</strong></div><div className="metric"><span>STEREO CORRELATION</span><strong>{analysis.metrics.stereo_correlation == null ? "—" : analysis.metrics.stereo_correlation.toFixed(2)}</strong></div><div className="metric"><span>MONO FOLD-DOWN</span><strong>{analysis.metrics.mono_fold_down_db == null ? "—" : `${analysis.metrics.mono_fold_down_db.toFixed(1)} dB`}</strong></div></div>}{analysis && <p className="analysis-note">{analysis.duration_seconds.toFixed(1)} sec · {analysis.sample_rate.toLocaleString()} Hz · {analysis.channels} source channel(s). Metrics are measurements, not a quality score.</p>}</section>
       <div className="section-heading effects-heading"><div><div className="eyebrow">02 / SOUND DESIGN</div><h3>Shape your space</h3></div><button className="reset-button" type="button" onClick={resetSettings}>↺ Reset</button></div>
