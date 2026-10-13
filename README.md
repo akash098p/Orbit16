@@ -4,75 +4,78 @@ Offline-first stereo spatial audio effects for Windows desktop and a local brows
 
 > “16D” is a community label rather than a standardized audio format. Orbit16 creates a controllable stereo spatial-motion effect using DSP. It does not add true 3D source recordings or recover information missing from the source.
 
-## Current implementation
+## Implementation
 
-Phase 1 foundation and Phase 2 interaction workflows are implemented. Phase 3 adds 4x oversampled true-peak estimation with static gain protection, integrated loudness (LUFS), stereo correlation, mono fold-down metrics, smoothed motion, and independent effect bypass controls. The app remains an offline-first creative stereo effect; it does not generate discrete object-based 3D audio.
+- Phase 1: local API, shared DSP engine, React interface, themes, configuration, logs and tests.
+- Phase 2: waveform/source/output playback, batch queue, saved presets, persistent controls and per-file status.
+- Phase 3: oversampled true-peak estimation with static gain protection, LUFS/stereo/mono diagnostics, smoothed motion and effect bypass.
+- Phase 4 tooling: PyInstaller onedir spec, Windows build script, offline asset audit, distribution notes and MIT license.
 
-## Targets
-
-- Local/offline processing; no cloud API or audio upload.
-- Shared engine for the React browser UI and Windows desktop wrapper.
-- Non-destructive source handling and explicit output paths.
-- Stereo movement, mid/side width, reverb, safe peak handling, high-quality WAV export.
-- Configurable logging, themes, presets, and tests.
+The app is an offline-first creative stereo effect; it does not generate discrete object-based 3D audio. The peak stage is static gain reduction, not a look-ahead limiter or loudness normalizer.
 
 ## Requirements
 
-- Windows 10/11 (development target)
+- Windows 10/11 x64 for desktop packaging
 - Python 3.12 recommended
 - Node.js 20+ and npm
-- FFmpeg installed locally and available on `PATH` for MP3/M4A/AAC/Ogg decoding
+- FFmpeg on PATH for compressed audio decoding (not bundled)
 
-## Quick start
+## Development quick start
 
-1. Create and activate a virtual environment in the repository root:
+PowerShell from the repository root:
 
-   ```powershell
-   py -3.12 -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   python -m pip install --upgrade pip
-   pip install -r backend/requirements.txt
-   ```
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r backend/requirements.txt
+```
 
-2. Check that `ffmpeg -version` works if you need compressed input formats.
-3. Start the API from the repository root:
+Start the local API in one terminal:
 
-   ```powershell
-   uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
-   ```
+```powershell
+uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
 
-4. In a second terminal:
+Start the frontend in a second terminal:
 
-   ```powershell
-   cd frontend
-   npm install
-   npm run dev
-   ```
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-5. Open the local Vite URL shown in the terminal. The UI uses a Vite proxy to the loopback-only API.
+Open the local Vite URL printed by the command. The frontend proxies API calls to loopback only.
 
-For the desktop wrapper, build the frontend first, then run the launcher from the repository root:
+## Build a Windows portable folder
 
-   ```powershell
-   cd frontend
-   npm run build
-   cd ..
-   python desktop/launcher.py
-   ```
+On Windows with Python 3.12 x64, Node.js and npm installed:
 
-The desktop launcher serves the built UI through the same local API on loopback port 8765.
+```powershell
+.\scripts\build_windows.ps1
+```
+
+The portable onedir output is `dist/Orbit16Studio/`; launch `Orbit16Studio.exe` from that folder. Keep the entire folder together. This is not an MSI installer and has not been declared release-tested until built and smoke-tested on Windows.
+
+Run the offline resource audit after building the frontend:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/audit_offline.py
+```
+
+See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) for FFmpeg licensing, clean-machine tests and release checklist.
 
 ## Security and privacy
 
 - Bind the service to `127.0.0.1`, not `0.0.0.0`.
-- Do not expose the local API to a LAN or the public internet.
-- Uploads are bounded and processed into managed temporary jobs; files are removed after response delivery.
-- Input files are read only; the application creates new output files.
+- Do not expose the local API to a LAN or public internet.
+- Uploads are bounded and processed in temporary job folders; input files are read only.
+- The static offline audit is a heuristic, not proof that all code paths are offline-safe.
 
 ## Audio quality notes
 
-Use lossless input where possible. Exporting a lossy MP3 to 24-bit WAV does not restore lost detail. The initial effects are creative DSP, not a guarantee of perceptually better sound. Always compare bypass and processed audio on headphones and speakers.
+Use lossless input where possible. Exporting lossy MP3 to 24-bit WAV does not restore lost detail. LUFS may be unavailable for silence or clips too short for valid meter blocks. Stereo correlation and mono fold-down metrics are diagnostic aids, not substitutes for listening tests. Always compare bypass and processed audio on headphones and speakers.
 
-## Quality and metering notes
+## License
 
-The true-peak stage estimates inter-sample peaks by 4x oversampling and applies static gain reduction to meet the configured ceiling. It is not a look-ahead limiter or loudness normalizer. LUFS can be unavailable for silence or clips too short for valid meter blocks. Correlation and mono-fold-down measurements are diagnostic aids, not a substitute for listening tests. Phase 4 focuses on packaging and clean-machine validation.
+Project source is MIT licensed; dependencies and any separately installed FFmpeg build have their own license terms. Review those terms before redistribution.
