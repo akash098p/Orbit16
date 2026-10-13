@@ -89,7 +89,6 @@ export default function App() {
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
   const [busy, setBusy] = useState(false);
-  const [cancelRequested, setCancelRequested] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completed, setCompleted] = useState<Completed[]>([]);
   const [status, setStatus] = useState("Ready for local processing");
@@ -130,12 +129,12 @@ export default function App() {
     if (!preset || preset.builtin) return;
     setPresets(old => old.filter(p => p.name !== preset.name)); setSelectedPreset(""); setStatus(`Removed preset · ${preset.name}`);
   }
-  function stop() { cancelRef.current = true; setCancelRequested(true); abortRef.current?.abort(); setStatus("Cancellation requested…"); }
+  function stop() { cancelRef.current = true; abortRef.current?.abort(); setStatus("Cancellation requested…"); }
 
   async function convertBatch() {
     if (!files.length || busy) return;
     const queue = [...files];
-    setBusy(true); cancelRef.current = false; setCancelRequested(false); setCurrentIndex(0); setError("");
+    setBusy(true); cancelRef.current = false; setCurrentIndex(0); setError("");
     const newResults: Completed[] = [];
     setStatus(`Starting batch · ${queue.length} file(s)`);
     try {
