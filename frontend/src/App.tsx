@@ -94,6 +94,11 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
   const trebleRef = useRef<BiquadFilterNode | null>(null);
   const lfoRef = useRef<OscillatorNode | null>(null);
   const lfoGainRef = useRef<GainNode | null>(null);
+  const recordDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<BlobPart[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const startAtRef = useRef(0);
   const offsetRef = useRef(0);
   const tickRef = useRef<number | null>(null);
@@ -175,7 +180,7 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
     const pan = ctx.createStereoPanner();
     const gain = ctx.createGain(); gain.gain.value = volume;
     source.buffer = buffer;
-    source.connect(bassFilter); bassFilter.connect(trebleFilter); trebleFilter.connect(pan); pan.connect(gain); gain.connect(ctx.destination);
+    source.connect(bassFilter); bassFilter.connect(trebleFilter); trebleFilter.connect(pan); pan.connect(gain); gain.connect(ctx.destination);\n    const recordDestination = ctx.createMediaStreamDestination();\n    gain.connect(recordDestination);\n    recordDestinationRef.current = recordDestination;
     bassRef.current = bassFilter; trebleRef.current = trebleFilter; panRef.current = pan; gainRef.current = gain;
     const lfo = ctx.createOscillator(); const lfoGain = ctx.createGain();
     lfo.type = "sine"; lfo.frequency.value = settings.movement_rate; lfoGain.gain.value = mode === "studio" ? 0 : settings.movement_enabled ? settings.movement_depth : 0;
@@ -195,7 +200,7 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
     }, 100);
   }
 
-  function pauseLive() {
+  function startRecording() {\n    const destination = recordDestinationRef.current;\n    if (!destination || !playing || typeof MediaRecorder === "undefined") { setMessage("Start live playback before recording."); return; }\n    recordedChunksRef.current = []; setRecordedBlob(null);\n    const preferred = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";\n    const recorder = new MediaRecorder(destination.stream, preferred ? { mimeType: preferred } : undefined);\n    recorder.ondataavailable = event => { if (event.data.size) recordedChunksRef.current.push(event.data); };\n    recorder.onstop = () => { const type = recorder.mimeType || "audio/webm"; setRecordedBlob(new Blob(recordedChunksRef.current, { type })); setRecording(false); setMessage("Recording ready · download your live processed audio."); };\n    recorderRef.current = recorder; recorder.start(); setRecording(true); setMessage("RECORDING · capturing the sound you hear, including live mode and EQ.");\n  }\n  function stopRecording() { if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop(); }\n  function downloadRecording() {\n    if (!recordedBlob) return;\n    const url = URL.createObjectURL(recordedBlob); const anchor = document.createElement("a");\n    const ext = recordedBlob.type.includes("webm") ? "webm" : "audio";\n    anchor.href = url; anchor.download = `orbit16-live-mix.${ext}`; document.body.appendChild(anchor); anchor.click(); anchor.remove();\n    window.setTimeout(() => URL.revokeObjectURL(url), 30000);\n  }\n\n  function pauseLive() {
     const ctx = ctxRef.current;
     if (playing && ctx) offsetRef.current = Math.min(duration, ctx.currentTime - startAtRef.current);
     stopLive(false);
@@ -214,12 +219,12 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
 
   return <section className="live-panel">
     <div className="live-head"><div><div className="eyebrow accent">REAL-TIME AUDITION</div><h3>Live sound lab</h3><p>Browser-native live playback. Change the mode, EQ and level without exporting or reprocessing the track.</p></div><span className={playing ? "live-badge is-live" : "live-badge"}><i/>{playing ? "LIVE" : "READY"}</span></div>
-    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { stopLive(true); setMessage("Stopped."); }}>Stop</button><span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
+    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { if (recording) stopRecording(); stopLive(true); setMessage("Stopped."); }}>Stop</button>{!recording ? <button className="secondary-button" type="button" disabled={!playing} onClick={startRecording}>● Record mix</button> : <button className="secondary-button recording-button" type="button" onClick={stopRecording}>■ Stop recording</button>}{recordedBlob && <button className="secondary-button" type="button" onClick={downloadRecording}>↓ Download mix</button>}<span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
     <input className="range live-seek" aria-label="Live playback position" type="range" min={0} max={Math.max(duration, 0.1)} step={0.1} value={Math.min(position, duration || 0)} disabled={!duration} onChange={e => seekLive(Number(e.target.value))}/>
     <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => onModeChange(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
     <div className="live-eq"><div><span>BASS</span><strong>{bass > 0 ? "+" : ""}{bass} dB</strong><input className="range" aria-label="Live bass EQ" type="range" min={-12} max={12} step={1} value={bass} onChange={e => setBass(Number(e.target.value))}/></div><div><span>TREBLE</span><strong>{treble > 0 ? "+" : ""}{treble} dB</strong><input className="range" aria-label="Live treble EQ" type="range" min={-12} max={12} step={1} value={treble} onChange={e => setTreble(Number(e.target.value))}/></div></div>
     <p className="live-message" role="status">{message}</p>
-    <p className="analysis-note">Live modes are audition effects only; exported WAVs still use the offline DSP controls above. Keep monitor volume low before playback.</p>
+    <p className="analysis-note">Record the live mix to download the exact sound you hear, including the selected mode and EQ. The browser recording downloads as WebM; the WAV export above uses offline DSP controls.</p>
   </section>;
 }
 
