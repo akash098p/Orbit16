@@ -180,7 +180,10 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
     const pan = ctx.createStereoPanner();
     const gain = ctx.createGain(); gain.gain.value = volume;
     source.buffer = buffer;
-    source.connect(bassFilter); bassFilter.connect(trebleFilter); trebleFilter.connect(pan); pan.connect(gain); gain.connect(ctx.destination);\n    const recordDestination = ctx.createMediaStreamDestination();\n    gain.connect(recordDestination);\n    recordDestinationRef.current = recordDestination;
+    source.connect(bassFilter); bassFilter.connect(trebleFilter); trebleFilter.connect(pan); pan.connect(gain); gain.connect(ctx.destination);
+    const recordDestination = ctx.createMediaStreamDestination();
+    gain.connect(recordDestination);
+    recordDestinationRef.current = recordDestination;
     bassRef.current = bassFilter; trebleRef.current = trebleFilter; panRef.current = pan; gainRef.current = gain;
     const lfo = ctx.createOscillator(); const lfoGain = ctx.createGain();
     lfo.type = "sine"; lfo.frequency.value = settings.movement_rate; lfoGain.gain.value = mode === "studio" ? 0 : settings.movement_enabled ? settings.movement_depth : 0;
