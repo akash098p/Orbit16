@@ -80,7 +80,8 @@ type LiveExport = { mode: LiveMode; bass: number; treble: number };
 function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { file: File | null; settings: Settings; mode: LiveMode; onModeChange: (mode: LiveMode) => void; onExportChange: (value: LiveExport) => void }) {
   const [volume, setVolume] = useState(0.8);
   const [bass, setBass] = useState(0);
-  const [treble, setTreble] = useState(0);\n  useEffect(() => { onExportChange({ mode, bass, treble }); }, [mode, bass, treble, onExportChange]);
+  const [treble, setTreble] = useState(0);
+  useEffect(() => { onExportChange({ mode, bass, treble }); }, [mode, bass, treble, onExportChange]);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState(0);
