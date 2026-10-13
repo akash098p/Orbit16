@@ -4,9 +4,9 @@ Offline-first stereo spatial audio effects for Windows desktop and a local brows
 
 > “16D” is a community label rather than a standardized audio format. Orbit16 creates a controllable stereo spatial-motion effect using DSP. It does not add true 3D source recordings or recover information missing from the source.
 
-## Phase 1 — Foundation
+## Current implementation
 
-This repository contains the project layout, backend DSP foundation, configuration and theme files, logging, tests, frontend shell, desktop launcher scaffold, and setup documentation. This phase establishes the foundation; it is not yet the complete end-user converter.
+Phase 1 foundation and Phase 2 interaction workflows are implemented. Phase 3 adds 4x oversampled true-peak estimation with static gain protection, integrated loudness (LUFS), stereo correlation, mono fold-down metrics, smoothed motion, and independent effect bypass controls. The app remains an offline-first creative stereo effect; it does not generate discrete object-based 3D audio.
 
 ## Targets
 
@@ -73,6 +73,6 @@ The desktop launcher serves the built UI through the same local API on loopback 
 
 Use lossless input where possible. Exporting a lossy MP3 to 24-bit WAV does not restore lost detail. The initial effects are creative DSP, not a guarantee of perceptually better sound. Always compare bypass and processed audio on headphones and speakers.
 
-## Phase 1 status
+## Quality and metering notes
 
-Foundation only. Later phases should add real-time audition, waveform display, robust progress/cancellation, preset management, batch jobs, calibrated loudness analysis, a true-peak limiter, packaging, installer, and release validation.
+The true-peak stage estimates inter-sample peaks by 4x oversampling and applies static gain reduction to meet the configured ceiling. It is not a look-ahead limiter or loudness normalizer. LUFS can be unavailable for silence or clips too short for valid meter blocks. Correlation and mono-fold-down measurements are diagnostic aids, not a substitute for listening tests. Phase 4 focuses on packaging and clean-machine validation.
