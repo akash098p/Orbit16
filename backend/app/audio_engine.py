@@ -1,6 +1,6 @@
 """Offline stereo DSP engine with oversampled peak protection."""
 import numpy as np
-from pedalboard import Pedalboard, Reverb
+from pedalboard import HighShelfFilter, LowShelfFilter, Pedalboard, Reverb
 from scipy.signal import lfilter, resample_poly
 
 
@@ -37,6 +37,8 @@ def process_audio(
     movement_enabled: bool = True,
     width_enabled: bool = True,
     reverb_enabled: bool = True,
+    bass_gain_db: float = 0.0,
+    treble_gain_db: float = 0.0,
 ) -> np.ndarray:
     """Process mono/stereo samples shaped as frames x channels.
 
@@ -54,6 +56,8 @@ def process_audio(
         raise ValueError("stereo_width must be between 0 and 2.")
     if not 0 <= reverb_mix <= 0.5:
         raise ValueError("reverb_mix must be between 0 and 0.5.")
+    if not -12 <= bass_gain_db <= 12 or not -12 <= treble_gain_db <= 12:
+        raise ValueError("Bass and treble gain must be between -12 and 12 dB.")
     if not -12 <= output_ceiling_db <= -0.1:
         raise ValueError("output_ceiling_db must be between -12 and -0.1 dB.")
     if audio.ndim not in (1, 2):
@@ -86,6 +90,14 @@ def process_audio(
         angle = (pan + 1.0) * (np.pi / 4.0)
         output[:, 0] *= (np.sqrt(2.0) * np.cos(angle)).astype(np.float32)
         output[:, 1] *= (np.sqrt(2.0) * np.sin(angle)).astype(np.float32)
+
+    if bass_gain_db != 0 or treble_gain_db != 0:
+        eq = []
+        if bass_gain_db != 0:
+            eq.append(LowShelfFilter(cutoff_frequency_hz=180, gain_db=bass_gain_db))
+        if treble_gain_db != 0:
+            eq.append(HighShelfFilter(cutoff_frequency_hz=4500, gain_db=treble_gain_db))
+        output = Pedalboard(eq)(output.T, sample_rate=sample_rate).T.astype(np.float32)
 
     if reverb_enabled and reverb_mix > 0:
         effects = Pedalboard([Reverb(room_size=0.55, damping=0.5, wet_level=reverb_mix, dry_level=1.0, width=1.0)])
