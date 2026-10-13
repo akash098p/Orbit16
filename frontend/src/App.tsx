@@ -85,7 +85,7 @@ export default function App() {
   });
   const [theme, setTheme] = useState(() => localStorage.getItem("orbit16.theme") || "dark");
   const [presets, setPresets] = useState<Preset[]>(() => {
-    try { return [...builtinPresets, ...JSON.parse(localStorage.getItem("orbit16.presets") || "[]")]; } catch { return builtinPresets; }
+    try { return [...builtinPresets, ...JSON.parse(localStorage.getItem("orbit16.presets") || "[]").map((p: Preset) => ({ ...p, settings: { ...initialSettings, ...p.settings } }))]; } catch { return builtinPresets; }
   });
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
