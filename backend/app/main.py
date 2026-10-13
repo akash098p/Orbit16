@@ -8,7 +8,8 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
-from app.audio_engine import process_audio\nfrom app.analysis import analyze_audio
+from app.audio_engine import process_audio
+from app.analysis import analyze_audio
 from app.audio_io import AudioDecodeError, SUPPORTED_EXTENSIONS, decode_to_float_wav, read_float_wav, write_24bit_wav
 from app.config import settings
 from app.logging_config import configure_logging
@@ -29,6 +30,9 @@ async def convert(
     stereo_width: Annotated[float, Form(ge=0, le=2)] = 1.2,
     reverb_mix: Annotated[float, Form(ge=0, le=0.5)] = 0.12,
     output_ceiling_db: Annotated[float, Form(ge=-12, le=-0.1)] = -1.0,
+    movement_enabled: Annotated[bool, Form()] = True,
+    width_enabled: Annotated[bool, Form()] = True,
+    reverb_enabled: Annotated[bool, Form()] = True,
 ):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
@@ -51,7 +55,9 @@ async def convert(
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
         decode_to_float_wav(source, decoded)
         audio, sample_rate = read_float_wav(decoded)
-        result = process_audio(audio, sample_rate, movement_depth=movement_depth, movement_rate=movement_rate, stereo_width=stereo_width, reverb_mix=reverb_mix, output_ceiling_db=output_ceiling_db)
+        if len(audio) / sample_rate > settings.max_duration_seconds:
+            raise HTTPException(status_code=413, detail=f"Maximum audio duration is {settings.max_duration_seconds} seconds.")
+        result = process_audio(audio, sample_rate, movement_depth=movement_depth, movement_rate=movement_rate, stereo_width=stereo_width, reverb_mix=reverb_mix, output_ceiling_db=output_ceiling_db, movement_enabled=movement_enabled, width_enabled=width_enabled, reverb_enabled=reverb_enabled)
         write_24bit_wav(output, result, sample_rate)
         logger.info("Converted duration %.2fs at %d Hz (%d input bytes)", len(audio) / sample_rate, sample_rate, total)
         return FileResponse(path=str(output), media_type="audio/wav", filename="orbit16_spatial.wav", background=BackgroundTask(shutil.rmtree, str(job_dir), ignore_errors=True))
