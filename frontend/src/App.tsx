@@ -203,7 +203,51 @@ function LiveAudition({ file, settings, mode, onModeChange }: { file: File | nul
     }, 100);
   }
 
-  function startRecording() {\n    const destination = recordDestinationRef.current;\n    if (!destination || !playing || typeof MediaRecorder === "undefined") { setMessage("Start live playback before recording."); return; }\n    recordedChunksRef.current = []; setRecordedBlob(null);\n    const preferred = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";\n    const recorder = new MediaRecorder(destination.stream, preferred ? { mimeType: preferred } : undefined);\n    recorder.ondataavailable = event => { if (event.data.size) recordedChunksRef.current.push(event.data); };\n    recorder.onstop = () => { const type = recorder.mimeType || "audio/webm"; setRecordedBlob(new Blob(recordedChunksRef.current, { type })); setRecording(false); setMessage("Recording ready · download your live processed audio."); };\n    recorderRef.current = recorder; recorder.start(); setRecording(true); setMessage("RECORDING · capturing the sound you hear, including live mode and EQ.");\n  }\n  function stopRecording() { if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop(); }\n  function downloadRecording() {\n    if (!recordedBlob) return;\n    const url = URL.createObjectURL(recordedBlob); const anchor = document.createElement("a");\n    const ext = recordedBlob.type.includes("webm") ? "webm" : "audio";\n    anchor.href = url; anchor.download = `orbit16-live-mix.${ext}`; document.body.appendChild(anchor); anchor.click(); anchor.remove();\n    window.setTimeout(() => URL.revokeObjectURL(url), 30000);\n  }\n\n  function pauseLive() {
+  function startRecording() {
+    const destination = recordDestinationRef.current;
+    if (!destination || !playing || typeof MediaRecorder === "undefined") {
+      setMessage("Start live playback before recording.");
+      return;
+    }
+    recordedChunksRef.current = [];
+    setRecordedBlob(null);
+    const preferred = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+    const recorder = new MediaRecorder(destination.stream, preferred ? { mimeType: preferred } : undefined);
+    recorder.ondataavailable = event => {
+      if (event.data.size) recordedChunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      const type = recorder.mimeType || "audio/webm";
+      setRecordedBlob(new Blob(recordedChunksRef.current, { type }));
+      setRecording(false);
+      setMessage("Recording ready · download your live processed audio.");
+    };
+    recorderRef.current = recorder;
+    recorder.start();
+    setRecording(true);
+    setMessage("RECORDING · capturing the sound you hear, including live mode and EQ.");
+  }
+
+  function stopRecording() {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+  }
+
+  function downloadRecording() {
+    if (!recordedBlob) return;
+    const url = URL.createObjectURL(recordedBlob);
+    const anchor = document.createElement("a");
+    const ext = recordedBlob.type.includes("webm") ? "webm" : "audio";
+    anchor.href = url;
+    anchor.download = `orbit16-live-mix.${ext}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
+
+  function pauseLive() {
     const ctx = ctxRef.current;
     if (playing && ctx) offsetRef.current = Math.min(duration, ctx.currentTime - startAtRef.current);
     stopLive(false);
