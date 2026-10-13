@@ -283,7 +283,8 @@ function Control({ title, subtitle, value, label, min, max, step, onChange }: { 
 
 export default function App() {
   const [files, setFiles] = useState<File[]>([]);
-  const [liveMode, setLiveMode] = useState<LiveMode>("orbit");\n  const [liveExport, setLiveExport] = useState<LiveExport>({ mode: "orbit", bass: 0, treble: 0 });
+  const [liveMode, setLiveMode] = useState<LiveMode>("orbit");
+  const [liveExport, setLiveExport] = useState<LiveExport>({ mode: "orbit", bass: 0, treble: 0 });
   const [settings, setSettings] = useState<Settings>(() => {
     try { return { ...initialSettings, ...JSON.parse(localStorage.getItem("orbit16.settings") || "{}") }; } catch { return initialSettings; }
   });
