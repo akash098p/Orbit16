@@ -1,9 +1,10 @@
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
-type Settings = { movement_depth: number; movement_rate: number; stereo_width: number; reverb_mix: number; output_ceiling_db: number };
+type Settings = { movement_depth: number; movement_rate: number; stereo_width: number; reverb_mix: number; output_ceiling_db: number; movement_enabled: boolean; width_enabled: boolean; reverb_enabled: boolean };
 type Preset = { name: string; settings: Settings; builtin?: boolean };
 type Completed = { id: string; sourceName: string; outputName: string; url: string; size: number };
-const initialSettings: Settings = { movement_depth: 0.65, movement_rate: 0.12, stereo_width: 1.2, reverb_mix: 0.12, output_ceiling_db: -1 };
+type Analysis = { duration_seconds: number; sample_rate: number; channels: number; metrics: { integrated_lufs: number | null; true_peak_dbtp: number | null; stereo_correlation: number | null; mono_fold_down_db: number | null } };
+const initialSettings: Settings = { movement_depth: 0.65, movement_rate: 0.12, stereo_width: 1.2, reverb_mix: 0.12, output_ceiling_db: -1, movement_enabled: true, width_enabled: true, reverb_enabled: true };
 const builtinPresets: Preset[] = [
   { name: "Gentle Orbit", builtin: true, settings: { ...initialSettings, movement_depth: 0.28, movement_rate: 0.08, stereo_width: 1.08, reverb_mix: 0.07 } },
   { name: "Deep Space", builtin: true, settings: { ...initialSettings, movement_depth: 0.88, movement_rate: 0.16, stereo_width: 1.55, reverb_mix: 0.2 } },
@@ -84,7 +85,7 @@ export default function App() {
   });
   const [theme, setTheme] = useState(() => localStorage.getItem("orbit16.theme") || "dark");
   const [presets, setPresets] = useState<Preset[]>(() => {
-    try { return [...builtinPresets, ...JSON.parse(localStorage.getItem("orbit16.presets") || "[]")]; } catch { return builtinPresets; }
+    try { return [...builtinPresets, ...JSON.parse(localStorage.getItem("orbit16.presets") || "[]").map((p: Preset) => ({ ...p, settings: { ...initialSettings, ...p.settings } }))]; } catch { return builtinPresets; }
   });
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
@@ -93,8 +94,11 @@ export default function App() {
   const [completed, setCompleted] = useState<Completed[]>([]);
   const [status, setStatus] = useState("Ready for local processing");
   const [error, setError] = useState("");
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);\n  const cancelRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const cancelRef = useRef(false);
   const activeFile = files[0] ?? null;
   const fileLabel = useMemo(() => files.length ? files.length === 1 ? `${files[0].name} · ${(files[0].size / 1024 / 1024).toFixed(1)} MB` : `${files.length} files queued · ${(files.reduce((n, f) => n + f.size, 0) / 1024 / 1024).toFixed(1)} MB total` : "WAV, FLAC, MP3, M4A, AAC, OGG", [files]);
 
@@ -117,6 +121,14 @@ export default function App() {
   function onDrop(event: DragEvent<HTMLLabelElement>) { event.preventDefault(); setDragging(false); if (event.dataTransfer.files) addFiles(event.dataTransfer.files); }
   function clearQueue() { if (busy) return; setFiles([]); setError(""); setStatus("Queue cleared"); }
   function resetSettings() { setSettings(initialSettings); setSelectedPreset(""); }
+  function toggleEffect(key: "movement_enabled" | "width_enabled" | "reverb_enabled") { setSettings(old => ({ ...old, [key]: !old[key] })); }
+  async function analyzeSource() {
+    if (!activeFile || analyzing) return;
+    setAnalyzing(true); setError(""); setAnalysis(null);
+    try { const body = new FormData(); body.append("file", activeFile); const response = await fetch("/api/analyze", { method: "POST", body }); if (!response.ok) { let message = `Analysis failed (${response.status})`; try { message = (await response.json()).detail ?? message; } catch {} throw new Error(message); } setAnalysis(await response.json()); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Audio analysis failed."); }
+    finally { setAnalyzing(false); }
+  }
   function loadPreset(name: string) { const preset = presets.find(p => p.name === name); if (preset) { setSettings(preset.settings); setSelectedPreset(name); setStatus(`Preset loaded · ${name}`); } }
   function savePreset() {
     const name = presetName.trim();
@@ -186,8 +198,10 @@ export default function App() {
       {files.length > 0 && <section className="queue-panel"><div className="queue-head"><strong>Batch queue <span>{files.length}</span></strong><button type="button" className="text-button" onClick={clearQueue} disabled={busy}>Clear queue</button></div><div className="queue-list">{files.map((f, i) => <div className="queue-item" key={`${f.name}-${f.size}-${f.lastModified}`}><span className="queue-number">{String(i + 1).padStart(2, "0")}</span><div className="queue-file"><strong>{f.name}</strong><small>{(f.size / 1024 / 1024).toFixed(2)} MB</small></div><span className="queue-state">{busy && i === currentIndex ? "PROCESSING" : "QUEUED"}</span></div>)}</div></section>}
       <Waveform file={activeFile} label={activeFile ? activeFile.name : "Source waveform"}/>
       {activeFile && <section className="preview-panel"><div><div className="eyebrow">BEFORE / SOURCE</div><h3>Listen to original</h3></div><SourcePreview file={activeFile}/></section>}
+      <section className="analysis-panel"><div className="analysis-head"><div><div className="eyebrow">SOURCE DIAGNOSTICS</div><h3>Listen with numbers</h3><p>Integrated loudness, estimated true peak, stereo correlation and mono fold-down compatibility.</p></div><button className="secondary-button" type="button" onClick={analyzeSource} disabled={!activeFile || analyzing}>{analyzing ? "Analysing…" : "Analyse source"}</button></div>{analysis && <div className="metrics-grid"><div className="metric"><span>INTEGRATED LOUDNESS</span><strong>{analysis.metrics.integrated_lufs == null ? "—" : `${analysis.metrics.integrated_lufs.toFixed(1)} LUFS`}</strong></div><div className="metric"><span>EST. TRUE PEAK</span><strong>{analysis.metrics.true_peak_dbtp == null ? "—" : `${analysis.metrics.true_peak_dbtp.toFixed(1)} dBTP`}</strong></div><div className="metric"><span>STEREO CORRELATION</span><strong>{analysis.metrics.stereo_correlation == null ? "—" : analysis.metrics.stereo_correlation.toFixed(2)}</strong></div><div className="metric"><span>MONO FOLD-DOWN</span><strong>{analysis.metrics.mono_fold_down_db == null ? "—" : `${analysis.metrics.mono_fold_down_db.toFixed(1)} dB`}</strong></div></div>}{analysis && <p className="analysis-note">{analysis.duration_seconds.toFixed(1)} sec · {analysis.sample_rate.toLocaleString()} Hz · {analysis.channels} source channel(s). Metrics are measurements, not a quality score.</p>}</section>
       <div className="section-heading effects-heading"><div><div className="eyebrow">02 / SOUND DESIGN</div><h3>Shape your space</h3></div><button className="reset-button" type="button" onClick={resetSettings}>↺ Reset</button></div>
       <section className="preset-panel"><div className="preset-load"><label>Load preset<select value={selectedPreset} onChange={e => loadPreset(e.target.value)}><option value="">Choose a sound profile…</option>{presets.map(p => <option key={p.name} value={p.name}>{p.name}{p.builtin ? " · built-in" : ""}</option>)}</select></label><button className="text-button" type="button" onClick={deletePreset} disabled={!selectedPreset || !!presets.find(p => p.name === selectedPreset)?.builtin}>Delete saved</button></div><div className="preset-save"><input aria-label="Preset name" placeholder="Name your preset" value={presetName} maxLength={40} onChange={e => setPresetName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") savePreset(); }}/><button type="button" className="secondary-button" onClick={savePreset}>Save current settings</button></div><p>Presets and controls are saved in this browser on this device.</p></section>
+      <section className="effect-bypasses" aria-label="Effect enable switches"><label><input type="checkbox" checked={settings.movement_enabled} onChange={() => toggleEffect("movement_enabled")}/> Orbit movement</label><label><input type="checkbox" checked={settings.width_enabled} onChange={() => toggleEffect("width_enabled")}/> Stereo width</label><label><input type="checkbox" checked={settings.reverb_enabled} onChange={() => toggleEffect("reverb_enabled")}/> Room reverb</label></section>
       <section className="controls-grid">
         <Control title="Orbit depth" subtitle="LEFT ↔ RIGHT SWEEP" value={settings.movement_depth} label={fmt(settings.movement_depth)} min={0} max={1} step={0.01} onChange={v => update("movement_depth", v)}/>
         <Control title="Movement speed" subtitle="ORBIT RATE" value={settings.movement_rate} label={`${fmt(settings.movement_rate)} Hz`} min={0.02} max={1} step={0.01} onChange={v => update("movement_rate", v)}/>
