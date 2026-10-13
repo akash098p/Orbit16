@@ -1,35 +1,29 @@
 # Roadmap
 
 ## Phase 1 — Foundation
-- Initial repository structure and documentation
-- Python and frontend dependencies
-- Runtime configuration and rotating logs
-- Five theme JSON files and starter DSP presets
-- Offline DSP engine and local API
-- Responsive React interface with effect controls and WAV download
-- Desktop pywebview launcher scaffold
-- Unit tests and CI workflow
+- [x] Repository structure, configuration, themes, logs, tests and CI
+- [x] Offline DSP engine and local conversion API
+- [x] React interface and desktop launcher scaffold
 
 ## Phase 2 — Playback and interaction
-- [x] Browser-side waveform preview and source duration/sample-rate information
-- [x] Original audio playback and processed-output audition
-- [x] Multi-file batch queue with per-file status and aggregate progress
-- [x] Cancel the active browser request and stop submitting remaining files
-- [x] Load built-in sound profiles and save/delete custom presets in browser storage
-- [x] Persist effect controls and appearance preference locally
-- [x] Output names derived safely from source filenames
-- [x] Include output-ceiling control in the UI
-- [ ] Server-side job registry and cooperative cancellation during active DSP (future hardening)
-- [ ] Sample-level processing progress reporting
+- [x] Browser waveform and original/output playback
+- [x] Multi-file queue, per-file status and cancellation of the browser request
+- [x] Built-in and user-saved presets; persisted settings and appearance
+- [x] Output ceiling control and safe output naming
 
-## Phase 3 — DSP quality
-- True-peak limiter and loudness analysis
-- Phase correlation and mono-compatibility meter
-- Smoothed movement trajectories and effect bypass
-- Listening-test fixtures and reproducible benchmarks
+## Phase 3 — DSP quality and metering
+- [x] 4x oversampled inter-sample peak estimation and static true-peak ceiling guard
+- [x] Integrated loudness (LUFS) analysis
+- [x] Stereo correlation and mono fold-down compatibility metrics
+- [x] Independent bypass toggles for movement, width and reverb
+- [x] Smoothed movement trajectory
+- [x] Configured maximum-duration enforcement in conversion and analysis
+- [x] Unit tests for metering and peak protection
+- [ ] Look-ahead limiting with gain-reduction metering (future improvement)
+- [ ] Listening-test fixtures and reproducible DSP benchmarks
 
 ## Phase 4 — Distribution
-- FFmpeg packaging with applicable license notices
-- PyInstaller build, Windows installer, and app icon
-- Strict offline resource audit and clean-machine tests
-- Release artifacts and regression workflow
+- [ ] Bundle or document FFmpeg licensing and distribution options
+- [ ] PyInstaller build, Windows installer, and app icon
+- [ ] Strict offline resource audit and clean-machine tests
+- [ ] Release artifacts and regression workflow
