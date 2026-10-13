@@ -51,6 +51,17 @@ This repository contains the project layout, backend DSP foundation, configurati
 
 5. Open the local Vite URL shown in the terminal. The UI uses a Vite proxy to the loopback-only API.
 
+For the desktop wrapper, build the frontend first, then run the launcher from the repository root:
+
+   ```powershell
+   cd frontend
+   npm run build
+   cd ..
+   python desktop/launcher.py
+   ```
+
+The desktop launcher serves the built UI through the same local API on loopback port 8765.
+
 ## Security and privacy
 
 - Bind the service to `127.0.0.1`, not `0.0.0.0`.
