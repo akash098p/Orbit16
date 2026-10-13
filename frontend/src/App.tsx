@@ -62,6 +62,17 @@ function Waveform({ file, label }: { file: File | null; label: string }) {
   return <section className="waveform-panel"><div className="waveform-heading"><div><div className="eyebrow">LOCAL AUDIO ANALYSIS</div><h3>{label}</h3></div><span className="subtle">Waveform</span></div><canvas ref={canvasRef} width={1000} height={116} aria-label="Audio waveform visualization"/><p>{message}</p></section>;
 }
 
+
+function SourcePreview({ file }: { file: File }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const next = URL.createObjectURL(file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  return <audio controls preload="metadata" src={url || undefined}/>;
+}
+
 function Control({ title, subtitle, value, label, min, max, step, onChange }: { title: string; subtitle: string; value: number; label: string; min: number; max: number; step: number; onChange: (value: number) => void }) {
   return <div className="control-card"><div className="control-top"><div><h4>{title}</h4><span>{subtitle}</span></div><output>{label}</output></div><input className="range" aria-label={title} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))}/><div className="range-ends"><span>{min}</span><span>{max}</span></div></div>;
 }
@@ -84,7 +95,7 @@ export default function App() {
   const [status, setStatus] = useState("Ready for local processing");
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef = useRef<AbortController | null>(null);\n  const cancelRef = useRef(false);
   const activeFile = files[0] ?? null;
   const fileLabel = useMemo(() => files.length ? files.length === 1 ? `${files[0].name} · ${(files[0].size / 1024 / 1024).toFixed(1)} MB` : `${files.length} files queued · ${(files.reduce((n, f) => n + f.size, 0) / 1024 / 1024).toFixed(1)} MB total` : "WAV, FLAC, MP3, M4A, AAC, OGG", [files]);
 
@@ -119,12 +130,12 @@ export default function App() {
     if (!preset || preset.builtin) return;
     setPresets(old => old.filter(p => p.name !== preset.name)); setSelectedPreset(""); setStatus(`Removed preset · ${preset.name}`);
   }
-  function stop() { setCancelRequested(true); abortRef.current?.abort(); setStatus("Cancellation requested…"); }
+  function stop() { cancelRef.current = true; setCancelRequested(true); abortRef.current?.abort(); setStatus("Cancellation requested…"); }
 
   async function convertBatch() {
     if (!files.length || busy) return;
     const queue = [...files];
-    setBusy(true); setCancelRequested(false); setCurrentIndex(0); setError("");
+    setBusy(true); cancelRef.current = false; setCancelRequested(false); setCurrentIndex(0); setError("");
     const newResults: Completed[] = [];
     setStatus(`Starting batch · ${queue.length} file(s)`);
     try {
@@ -146,7 +157,7 @@ export default function App() {
         newResults.push({ id: makeId(), sourceName: source.name, outputName: outputNameFor(source.name), url: URL.createObjectURL(blob), size: blob.size });
         setCompleted(old => [...old, newResults[newResults.length - 1]]);
       }
-      if (cancelRequested || abortRef.current?.signal.aborted) setStatus(`Stopped · ${newResults.length} of ${queue.length} file(s) completed`);
+      if (cancelRef.current || abortRef.current?.signal.aborted) setStatus(`Stopped · ${newResults.length} of ${queue.length} file(s) completed`);
       else setStatus(`Batch complete · ${newResults.length} of ${queue.length} file(s) exported`);
       if (newResults.length) setFiles(old => old.filter(f => !queue.includes(f)));
     } catch (reason) {
@@ -175,7 +186,7 @@ export default function App() {
       <label className={`drop-zone ${files.length ? "has-file" : ""} ${dragging ? "dragging" : ""}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}><input type="file" multiple accept={audioAccept} onChange={choose}/><span className="upload-icon">↑</span><span className="drop-main">{files.length ? "Add more tracks or drop files here" : "Drop tracks here or browse files"}</span><span className="drop-sub">{fileLabel}</span><span className="browse-button">Browse audio</span></label>
       {files.length > 0 && <section className="queue-panel"><div className="queue-head"><strong>Batch queue <span>{files.length}</span></strong><button type="button" className="text-button" onClick={clearQueue} disabled={busy}>Clear queue</button></div><div className="queue-list">{files.map((f, i) => <div className="queue-item" key={`${f.name}-${f.size}-${f.lastModified}`}><span className="queue-number">{String(i + 1).padStart(2, "0")}</span><div className="queue-file"><strong>{f.name}</strong><small>{(f.size / 1024 / 1024).toFixed(2)} MB</small></div><span className="queue-state">{busy && i === currentIndex ? "PROCESSING" : "QUEUED"}</span></div>)}</div></section>}
       <Waveform file={activeFile} label={activeFile ? activeFile.name : "Source waveform"}/>
-      {activeFile && <section className="preview-panel"><div><div className="eyebrow">BEFORE / SOURCE</div><h3>Listen to original</h3></div><audio controls preload="metadata" src={URL.createObjectURL(activeFile)} key={activeFile.name + activeFile.lastModified}/></section>}
+      {activeFile && <section className="preview-panel"><div><div className="eyebrow">BEFORE / SOURCE</div><h3>Listen to original</h3></div><SourcePreview file={activeFile}/></section>}
       <div className="section-heading effects-heading"><div><div className="eyebrow">02 / SOUND DESIGN</div><h3>Shape your space</h3></div><button className="reset-button" type="button" onClick={resetSettings}>↺ Reset</button></div>
       <section className="preset-panel"><div className="preset-load"><label>Load preset<select value={selectedPreset} onChange={e => loadPreset(e.target.value)}><option value="">Choose a sound profile…</option>{presets.map(p => <option key={p.name} value={p.name}>{p.name}{p.builtin ? " · built-in" : ""}</option>)}</select></label><button className="text-button" type="button" onClick={deletePreset} disabled={!selectedPreset || !!presets.find(p => p.name === selectedPreset)?.builtin}>Delete saved</button></div><div className="preset-save"><input aria-label="Preset name" placeholder="Name your preset" value={presetName} maxLength={40} onChange={e => setPresetName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") savePreset(); }}/><button type="button" className="secondary-button" onClick={savePreset}>Save current settings</button></div><p>Presets and controls are saved in this browser on this device.</p></section>
       <section className="controls-grid">
