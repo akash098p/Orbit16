@@ -21,7 +21,7 @@
 - Peak attenuation is not a look-ahead or true-peak limiter.
 - Reverb and widening may affect phase; future work should add bypass and correlation meters.
 - WAV export cannot restore detail lost in a lossy source.
-- Decorative web fonts are currently loaded from an external source; a strict offline build should bundle fonts locally.
+- The initial UI uses system font fallbacks to avoid runtime font requests.
 
 ## Security
 - Bind only to 127.0.0.1; do not expose the API to a LAN or public internet.
