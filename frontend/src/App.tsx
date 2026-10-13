@@ -74,6 +74,156 @@ function SourcePreview({ file }: { file: File }) {
   return <audio controls preload="metadata" src={url || undefined}/>;
 }
 
+type LiveMode = "studio" | "orbit" | "wide" | "bass" | "dream" | "night";
+
+function LiveAudition({ file, settings }: { file: File | null; settings: Settings }) {
+  const [mode, setMode] = useState<LiveMode>("orbit");
+  const [volume, setVolume] = useState(0.8);
+  const [bass, setBass] = useState(0);
+  const [treble, setTreble] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [message, setMessage] = useState("Choose a track, then press Play live.");
+  const ctxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const bufferRef = useRef<AudioBuffer | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const panRef = useRef<StereoPannerNode | null>(null);
+  const bassRef = useRef<BiquadFilterNode | null>(null);
+  const trebleRef = useRef<BiquadFilterNode | null>(null);
+  const lfoRef = useRef<OscillatorNode | null>(null);
+  const lfoGainRef = useRef<GainNode | null>(null);
+  const startAtRef = useRef(0);
+  const offsetRef = useRef(0);
+  const tickRef = useRef<number | null>(null);
+
+  function stopLive(reset = false) {
+    if (tickRef.current !== null) window.clearInterval(tickRef.current);
+    tickRef.current = null;
+    try { sourceRef.current?.stop(); } catch {}
+    sourceRef.current?.disconnect();
+    sourceRef.current = null;
+    lfoRef.current?.stop();
+    lfoRef.current?.disconnect();
+    lfoGainRef.current?.disconnect();
+    lfoRef.current = null;
+    lfoGainRef.current = null;
+    setPlaying(false);
+    if (reset) { offsetRef.current = 0; setPosition(0); }
+  }
+
+  useEffect(() => {
+    stopLive(true);
+    bufferRef.current = null;
+    setDuration(0);
+    if (!file) { setMessage("Choose a track, then press Play live."); return; }
+    let cancelled = false;
+    setLoading(true);
+    setMessage("Preparing local live preview…");
+    (async () => {
+      let temporary: AudioContext | null = null;
+      try {
+        temporary = new AudioContext();
+        const buffer = await temporary.decodeAudioData(await file.arrayBuffer());
+        if (cancelled) return;
+        bufferRef.current = buffer;
+        setDuration(buffer.duration);
+        setMessage("Ready · effects respond while the track plays.");
+      } catch {
+        if (!cancelled) setMessage("Live preview could not decode this file in the browser. Try WAV or FLAC.");
+      } finally {
+        if (temporary && temporary.state !== "closed") await temporary.close();
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [file]);
+
+  useEffect(() => {
+    if (gainRef.current && ctxRef.current) gainRef.current.gain.setTargetAtTime(volume, ctxRef.current.currentTime, 0.025);
+  }, [volume]);
+  useEffect(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    const profiles: Record<LiveMode, { pan: number; rate: number; bass: number; treble: number }> = {
+      studio: { pan: 0, rate: 0, bass: 0, treble: 0 },
+      orbit: { pan: settings.movement_enabled ? settings.movement_depth : 0, rate: settings.movement_rate, bass: 0, treble: 0 },
+      wide: { pan: settings.movement_enabled ? settings.movement_depth * 0.25 : 0, rate: settings.movement_rate * 0.5, bass: 0, treble: 1.5 },
+      bass: { pan: 0, rate: 0, bass: 5, treble: -1 },
+      dream: { pan: settings.movement_enabled ? settings.movement_depth * 0.7 : 0, rate: settings.movement_rate * 0.7, bass: 2, treble: 2 },
+      night: { pan: 0, rate: 0, bass: 2, treble: -5 },
+    };
+    const profile = profiles[mode];
+    if (bassRef.current) bassRef.current.gain.setTargetAtTime(profile.bass + bass, ctx.currentTime, 0.04);
+    if (trebleRef.current) trebleRef.current.gain.setTargetAtTime(profile.treble + treble, ctx.currentTime, 0.04);
+    if (panRef.current) panRef.current.pan.setTargetAtTime(0, ctx.currentTime, 0.04);
+    if (lfoGainRef.current) lfoGainRef.current.gain.setTargetAtTime(profile.pan, ctx.currentTime, 0.04);
+    if (lfoRef.current && profile.rate > 0) lfoRef.current.frequency.setTargetAtTime(profile.rate, ctx.currentTime, 0.04);
+    else if (lfoGainRef.current) lfoGainRef.current.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+  }, [mode, settings.movement_enabled, settings.movement_depth, settings.movement_rate, bass, treble]);
+
+  async function playLive() {
+    const buffer = bufferRef.current;
+    if (!buffer || playing) return;
+    const ctx = ctxRef.current ?? new AudioContext();
+    ctxRef.current = ctx;
+    await ctx.resume();
+    const source = ctx.createBufferSource();
+    const bassFilter = ctx.createBiquadFilter(); bassFilter.type = "lowshelf"; bassFilter.frequency.value = 180;
+    const trebleFilter = ctx.createBiquadFilter(); trebleFilter.type = "highshelf"; trebleFilter.frequency.value = 4500;
+    const pan = ctx.createStereoPanner();
+    const gain = ctx.createGain(); gain.gain.value = volume;
+    source.buffer = buffer;
+    source.connect(bassFilter); bassFilter.connect(trebleFilter); trebleFilter.connect(pan); pan.connect(gain); gain.connect(ctx.destination);
+    bassRef.current = bassFilter; trebleRef.current = trebleFilter; panRef.current = pan; gainRef.current = gain;
+    const lfo = ctx.createOscillator(); const lfoGain = ctx.createGain();
+    lfo.type = "sine"; lfo.frequency.value = settings.movement_rate; lfoGain.gain.value = mode === "studio" ? 0 : settings.movement_enabled ? settings.movement_depth : 0;
+    lfo.connect(lfoGain); lfoGain.connect(pan.pan); lfo.start();
+    lfoRef.current = lfo; lfoGainRef.current = lfoGain;
+    const startOffset = Math.min(offsetRef.current, Math.max(0, buffer.duration - 0.01));
+    startAtRef.current = ctx.currentTime - startOffset;
+    sourceRef.current = source;
+    source.onended = () => {
+      if (sourceRef.current === source) { stopLive(true); setMessage("Playback finished."); }
+    };
+    source.start(0, startOffset);
+    setPlaying(true); setMessage("LIVE · changes apply during playback");
+    tickRef.current = window.setInterval(() => {
+      const now = Math.min(buffer.duration, ctx.currentTime - startAtRef.current);
+      offsetRef.current = now; setPosition(now);
+    }, 100);
+  }
+
+  function pauseLive() {
+    const ctx = ctxRef.current;
+    if (playing && ctx) offsetRef.current = Math.min(duration, ctx.currentTime - startAtRef.current);
+    stopLive(false);
+    setPosition(offsetRef.current);
+    setMessage("Paused · press Play live to resume.");
+  }
+  function seekLive(value: number) {
+    offsetRef.current = value; setPosition(value);
+    if (playing) { stopLive(false); void playLive(); }
+  }
+  useEffect(() => () => {
+    stopLive(true);
+    const ctx = ctxRef.current;
+    if (ctx && ctx.state !== "closed") void ctx.close();
+  }, []);
+
+  return <section className="live-panel">
+    <div className="live-head"><div><div className="eyebrow accent">REAL-TIME AUDITION</div><h3>Live sound lab</h3><p>Browser-native live playback. Change the mode, EQ and level without exporting or reprocessing the track.</p></div><span className={playing ? "live-badge is-live" : "live-badge"}><i/>{playing ? "LIVE" : "READY"}</span></div>
+    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { stopLive(true); setMessage("Stopped."); }}>Stop</button><span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
+    <input className="range live-seek" aria-label="Live playback position" type="range" min={0} max={Math.max(duration, 0.1)} step={0.1} value={Math.min(position, duration || 0)} disabled={!duration} onChange={e => seekLive(Number(e.target.value))}/>
+    <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => setMode(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
+    <div className="live-eq"><div><span>BASS</span><strong>{bass > 0 ? "+" : ""}{bass} dB</strong><input className="range" aria-label="Live bass EQ" type="range" min={-12} max={12} step={1} value={bass} onChange={e => setBass(Number(e.target.value))}/></div><div><span>TREBLE</span><strong>{treble > 0 ? "+" : ""}{treble} dB</strong><input className="range" aria-label="Live treble EQ" type="range" min={-12} max={12} step={1} value={treble} onChange={e => setTreble(Number(e.target.value))}/></div></div>
+    <p className="live-message" role="status">{message}</p>
+    <p className="analysis-note">Live modes are audition effects only; exported WAVs still use the offline DSP controls above. Keep monitor volume low before playback.</p>
+  </section>;
+}
+
 function Control({ title, subtitle, value, label, min, max, step, onChange }: { title: string; subtitle: string; value: number; label: string; min: number; max: number; step: number; onChange: (value: number) => void }) {
   return <div className="control-card"><div className="control-top"><div><h4>{title}</h4><span>{subtitle}</span></div><output>{label}</output></div><input className="range" aria-label={title} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))}/><div className="range-ends"><span>{min}</span><span>{max}</span></div></div>;
 }
@@ -197,6 +347,7 @@ export default function App() {
       <label className={`drop-zone ${files.length ? "has-file" : ""} ${dragging ? "dragging" : ""}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}><input type="file" multiple accept={audioAccept} onChange={choose}/><span className="upload-icon">↑</span><span className="drop-main">{files.length ? "Add more tracks or drop files here" : "Drop tracks here or browse files"}</span><span className="drop-sub">{fileLabel}</span><span className="browse-button">Browse audio</span></label>
       {files.length > 0 && <section className="queue-panel"><div className="queue-head"><strong>Batch queue <span>{files.length}</span></strong><button type="button" className="text-button" onClick={clearQueue} disabled={busy}>Clear queue</button></div><div className="queue-list">{files.map((f, i) => <div className="queue-item" key={`${f.name}-${f.size}-${f.lastModified}`}><span className="queue-number">{String(i + 1).padStart(2, "0")}</span><div className="queue-file"><strong>{f.name}</strong><small>{(f.size / 1024 / 1024).toFixed(2)} MB</small></div><span className="queue-state">{busy && i === currentIndex ? "PROCESSING" : "QUEUED"}</span></div>)}</div></section>}
       <Waveform file={activeFile} label={activeFile ? activeFile.name : "Source waveform"}/>
+      <LiveAudition file={activeFile} settings={settings}/>
       {activeFile && <section className="preview-panel"><div><div className="eyebrow">BEFORE / SOURCE</div><h3>Listen to original</h3></div><SourcePreview file={activeFile}/></section>}
       <section className="analysis-panel"><div className="analysis-head"><div><div className="eyebrow">SOURCE DIAGNOSTICS</div><h3>Listen with numbers</h3><p>Integrated loudness, estimated true peak, stereo correlation and mono fold-down compatibility.</p></div><button className="secondary-button" type="button" onClick={analyzeSource} disabled={!activeFile || analyzing}>{analyzing ? "Analysing…" : "Analyse source"}</button></div>{analysis && <div className="metrics-grid"><div className="metric"><span>INTEGRATED LOUDNESS</span><strong>{analysis.metrics.integrated_lufs == null ? "—" : `${analysis.metrics.integrated_lufs.toFixed(1)} LUFS`}</strong></div><div className="metric"><span>EST. TRUE PEAK</span><strong>{analysis.metrics.true_peak_dbtp == null ? "—" : `${analysis.metrics.true_peak_dbtp.toFixed(1)} dBTP`}</strong></div><div className="metric"><span>STEREO CORRELATION</span><strong>{analysis.metrics.stereo_correlation == null ? "—" : analysis.metrics.stereo_correlation.toFixed(2)}</strong></div><div className="metric"><span>MONO FOLD-DOWN</span><strong>{analysis.metrics.mono_fold_down_db == null ? "—" : `${analysis.metrics.mono_fold_down_db.toFixed(1)} dB`}</strong></div></div>}{analysis && <p className="analysis-note">{analysis.duration_seconds.toFixed(1)} sec · {analysis.sample_rate.toLocaleString()} Hz · {analysis.channels} source channel(s). Metrics are measurements, not a quality score.</p>}</section>
       <div className="section-heading effects-heading"><div><div className="eyebrow">02 / SOUND DESIGN</div><h3>Shape your space</h3></div><button className="reset-button" type="button" onClick={resetSettings}>↺ Reset</button></div>
