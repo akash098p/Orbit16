@@ -37,3 +37,23 @@
 .live-transport{display:flex;align-items:center;gap:8px;margin-top:16px}.live-time{margin-left:auto;font:10px 'DM Mono',monospace;color:var(--muted)}.live-seek{display:block;width:100%;margin:12px 0 18px}
 .live-modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}.live-modes>label,.live-volume{display:flex;flex-direction:column;gap:8px;font-size:10px;color:var(--muted)}.live-modes select{width:100%;padding:10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;font:11px system-ui,sans-serif}.live-volume strong{font:11px 'DM Mono',monospace;color:var(--accent)}.live-eq{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:13px}.live-eq>div{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px}.live-eq span{font:9px 'DM Mono',monospace;color:var(--muted)}.live-eq strong{font:11px 'DM Mono',monospace;color:var(--accent)}.live-eq input{grid-column:1/-1;width:100%}.live-message{font-size:10px;color:var(--accent);margin:13px 0 0}.live-panel .analysis-note{line-height:1.5}
 @media(max-width:560px){.live-head{flex-direction:column}.live-transport{flex-wrap:wrap}.live-time{width:100%;margin:4px 0 0}.live-modes,.live-eq{grid-template-columns:1fr}.live-transport .primary-button{flex:1}}
+
+/* Animated spatial-audio orbit: decorative motion, always running gently. */
+.orbit-visual{isolation:isolate;overflow:hidden}
+.orbit{will-change:transform}
+.orbit-one{animation:orbit-ellipse-one 11s linear infinite}
+.orbit-two{animation:orbit-ellipse-two 15s linear infinite}
+.orbit-three{animation:orbit-halo 9s ease-in-out infinite alternate}
+.orbit-core{position:relative;animation:listener-breathe 3.6s ease-in-out infinite;will-change:transform,box-shadow}
+.core-dot{animation:listener-glow 2s ease-in-out infinite}
+.orbit-track{position:absolute;width:150px;height:220px;border:1px solid transparent;border-radius:50%;transform:rotate(-27deg);pointer-events:none;z-index:2}
+.track-one{animation:orbit-ellipse-one 5.5s linear infinite}
+.track-two{width:210px;height:155px;transform:rotate(48deg);animation:orbit-ellipse-two 7.5s linear infinite}
+.orbit-satellite{position:absolute;left:50%;top:-4px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent),0 0 24px rgba(183,243,107,.55);transform:translateX(-50%)}
+.satellite-two{width:6px;height:6px;top:auto;bottom:-3px;background:#9c94ff;box-shadow:0 0 12px rgba(156,148,255,.8)}
+@keyframes orbit-ellipse-one{from{transform:rotate(-27deg)}to{transform:rotate(333deg)}}
+@keyframes orbit-ellipse-two{from{transform:rotate(48deg)}to{transform:rotate(408deg)}}
+@keyframes orbit-halo{from{transform:rotate(0deg) scale(.98)}to{transform:rotate(8deg) scale(1.04)}}
+@keyframes listener-breathe{0%,100%{transform:scale(1);box-shadow:0 0 38px rgba(126,123,255,.18),inset 0 0 18px rgba(255,255,255,.12)}50%{transform:scale(1.055);box-shadow:0 0 58px rgba(126,123,255,.34),inset 0 0 22px rgba(255,255,255,.2)}}
+@keyframes listener-glow{0%,100%{transform:scale(.9);box-shadow:0 0 12px var(--accent)}50%{transform:scale(1.18);box-shadow:0 0 25px var(--accent)}}
+@media(prefers-reduced-motion:reduce){.orbit-one,.orbit-two,.orbit-three,.orbit-track,.orbit-core,.core-dot{animation:none!important}}
