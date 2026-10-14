@@ -1,1 +1,14 @@
-{"name":"Midnight","mode":"dark","colors":{"background":"#0A0A0F","panel":"#111119","panel_secondary":"#151520","border":"#272733","text":"#ECECF4","muted":"#858597","accent":"#B7F36B","accent_secondary":"#8AA6FF"}}
+{
+  "name": "Midnight",
+  "mode": "dark",
+  "colors": {
+    "background": "#0A0A0F",
+    "panel": "#111119",
+    "panel_secondary": "#151520",
+    "border": "#272733",
+    "text": "#ECECF4",
+    "muted": "#858597",
+    "accent": "#B7F36B",
+    "accent_secondary": "#8AA6FF"
+  }
+}
