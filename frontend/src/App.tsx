@@ -404,7 +404,7 @@ export default function App() {
       <div className="brand"><div className="brand-mark" aria-hidden="true"><span/><span/><span/></div><div><strong>ORBIT<span>16</span></strong><small>STUDIO</small></div></div>
       <div className="side-section-label">WORKSPACE</div>
       <button className="side-link active" type="button"><span>◉</span> Spatial Studio</button>
-      <button className="side-link" type="button" onClick={() => document.getElementById("sound-design")?.scrollIntoView({ behavior: "smooth", block: "start" })}><span>02</span><span className="side-link-copy"><small>SOUND DESIGN</small><span>Shape your space</span></span></button>
+      <button className="side-link" type="button" onClick={() => document.getElementById("sound-design")?.scrollIntoView({ behavior: "smooth", block: "start" })}><span>02</span><span className="side-link-copy"><small>02 / SOUND DESIGN</small><strong>Shape your space</strong></span></button>
       <button className="side-link" type="button" onClick={resetSettings}><span>↺</span> Reset controls</button>
       <div className="sidebar-bottom"><div className="offline-pill"><i/> OFFLINE ENGINE</div><p>Audio stays on your device. No cloud processing.</p><label className="theme-select">Appearance<select value={theme} onChange={e => setTheme(e.target.value)}><option value="dark">Midnight</option><option value="light">Light</option></select></label><div className="version">PHASE 2 · WORKFLOW</div></div>
     </aside>
