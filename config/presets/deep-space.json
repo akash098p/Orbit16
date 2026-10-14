@@ -1,1 +1,11 @@
-{"name":"Deep Space","description":"More pronounced movement and wider ambience; use headphones.","settings":{"movement_depth":0.82,"movement_rate":0.16,"stereo_width":1.35,"reverb_mix":0.19,"output_ceiling_db":-1.0}}
+{
+  "name": "Deep Space",
+  "description": "More pronounced movement and wider ambience; use headphones.",
+  "settings": {
+    "movement_depth": 0.82,
+    "movement_rate": 0.16,
+    "stereo_width": 1.35,
+    "reverb_mix": 0.19,
+    "output_ceiling_db": -1.0
+  }
+}
