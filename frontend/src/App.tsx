@@ -90,6 +90,8 @@ const motionPatterns: { id: MotionPattern; label: string; detail: string; wave: 
 
 function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { file: File | null; settings: Settings; mode: LiveMode; onModeChange: (mode: LiveMode) => void; onExportChange: (value: LiveExport) => void }) {
   const [volume, setVolume] = useState(0.72);
+  const [exportFormat, setExportFormat] = useState<"wav" | "mp3">("mp3");
+  const [mp3Bitrate, setMp3Bitrate] = useState<"128" | "192" | "320">("192");
   const [pattern, setPattern] = useState<MotionPattern>("orbit");
   const [bass, setBass] = useState(0);
   const [treble, setTreble] = useState(0);
@@ -265,13 +267,31 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
       source.start(0);
       const rendered = await offline.startRendering();
       const wav = encodeWav(rendered);
-      const url = URL.createObjectURL(wav);
+      let outputBlob = wav;
+      let extension = "wav";
+      if (exportFormat === "mp3") {
+        setMessage(`Encoding compact MP3 at ${mp3Bitrate} kbps locally…`);
+        const form = new FormData();
+        form.append("file", new File([wav], "orbit16_live_mix.wav", { type: "audio/wav" }));
+        form.append("bitrate", mp3Bitrate);
+        const response = await fetch("/api/encode", { method: "POST", body: form });
+        if (!response.ok) {
+          let detail = "MP3 encoding failed.";
+          try { const payload = await response.json(); detail = payload.detail || detail; } catch {}
+          throw new Error(detail);
+        }
+        outputBlob = await response.blob();
+        extension = "mp3";
+      }
+      const url = URL.createObjectURL(outputBlob);
       const anchor = document.createElement("a");
       const baseName = file?.name.replace(/\\.[^.]+$/, "") || "audio";
-      anchor.href = url; anchor.download = `${baseName}_orbit16_live_mix.wav`;
+      anchor.href = url; anchor.download = `${baseName}_orbit16_live_mix.${extension}`;
       document.body.appendChild(anchor); anchor.click(); anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-      setMessage("Download ready · rendered from the selected live mode, motion pattern and bass/treble settings.");
+      setMessage(exportFormat === "mp3"
+        ? `MP3 download ready · ${mp3Bitrate} kbps · encoded locally from your rendered live mix.`
+        : "WAV download ready · rendered from the selected live mode, motion pattern and bass/treble settings.");
     } catch (reason) {
       setMessage(reason instanceof Error ? `Export failed: ${reason.message}` : "Export failed.");
     }
@@ -362,7 +382,15 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
   return <section className="live-panel">
     <div className="live-head"><div><div className="eyebrow accent">REAL-TIME AUDITION</div><h3>Live sound lab</h3><p>Browser-native live playback. Change the mode, EQ and level without exporting or reprocessing the track.</p></div><span className={playing ? "live-badge is-live" : "live-badge"}><i/>{playing ? "LIVE" : "READY"}</span></div>
     <div className={`spatial-stage ${playing ? "stage-playing" : ""} pattern-${pattern}`} aria-label={`Stereo field monitor: ${selectedMotion.label}`}><div className="stage-grid"/><div className="stage-axis axis-x"/><div className="stage-axis axis-y"/><div className="stage-scale scale-one"/><div className="stage-scale scale-two"/><div className="stage-scale scale-three"/><div className="stage-ring ring-a"/><div className="stage-ring ring-b"/><div className="stage-ring ring-c"/><div className="stage-trail"/><div className="stage-center"><span/></div><div className="stage-readout readout-top"><span>STEREO FIELD MONITOR</span><strong>{playing ? "SIGNAL ACTIVE" : "SIGNAL STANDBY"}</strong></div><div className="stage-readout readout-left"><span>LEFT</span><strong>−90°</strong><i/></div><div className="stage-readout readout-right"><span>RIGHT</span><strong>+90°</strong><i/></div><div className="stage-readout readout-bottom"><span>MOTION PROFILE</span><strong>{selectedMotion.label.toUpperCase()}</strong><small>{playing ? "PLAYBACK RUNNING" : "AWAITING PLAYBACK"}</small></div><span className="stage-caption">{playing ? "LIVE SIGNAL · STEREO MOTION" : "STEREO MOTION PREVIEW"}</span></div>
-    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { if (recording) stopRecording(); stopLive(true); setMessage("Stopped."); }}>Stop</button>{<button className="secondary-button" type="button" disabled={!file || loading} onClick={() => void downloadProcessedMix()}>↓ Download live mix</button>}{!recording ? <button className="secondary-button" type="button" disabled={!playing} onClick={startRecording}>● Record mix</button> : <button className="secondary-button recording-button" type="button" onClick={stopRecording}>■ Stop recording</button>}{recordedBlob && <button className="secondary-button" type="button" onClick={downloadRecording}>↓ Download mix</button>}<span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
+    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { if (recording) stopRecording(); stopLive(true); setMessage("Stopped."); }}>Stop</button>{<label className="live-export-select">Export
+      <select aria-label="Live mix export format" value={exportFormat} onChange={e => setExportFormat(e.target.value as "wav" | "mp3")}>
+        <option value="mp3">MP3 · compact</option><option value="wav">WAV · lossless</option>
+      </select>
+    </label>{exportFormat === "mp3" && <label className="live-export-select">Bitrate
+      <select aria-label="MP3 bitrate" value={mp3Bitrate} onChange={e => setMp3Bitrate(e.target.value as "128" | "192" | "320")}>
+        <option value="128">128 kbps</option><option value="192">192 kbps</option><option value="320">320 kbps</option>
+      </select>
+    </label>}<button className="secondary-button" type="button" disabled={!file || loading} onClick={() => void downloadProcessedMix()}>↓ Download live mix</button>}{!recording ? <button className="secondary-button" type="button" disabled={!playing} onClick={startRecording}>● Record mix</button> : <button className="secondary-button recording-button" type="button" onClick={stopRecording}>■ Stop recording</button>}{recordedBlob && <button className="secondary-button" type="button" onClick={downloadRecording}>↓ Download mix</button>}<span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
     <input className="range live-seek" aria-label="Live playback position" type="range" min={0} max={Math.max(duration, 0.1)} step={0.1} value={Math.min(position, duration || 0)} disabled={!duration} onChange={e => seekLive(Number(e.target.value))}/>
     <div className="motion-patterns" aria-label="Spatial motion pattern"><div className="motion-pattern-head"><strong>Spatial motion</strong><span>{selectedMotion.detail}</span></div><div className="motion-pattern-grid">{motionPatterns.map(item => <button key={item.id} type="button" className={`motion-pattern ${pattern === item.id ? "active" : ""}`} aria-pressed={pattern === item.id} onClick={() => setPattern(item.id)}><span className={`pattern-glyph glyph-${item.id}`} aria-hidden="true"><i/></span><strong>{item.label}</strong><small>{item.id === "orbit" ? "Circular sweep" : item.id === "spiral" ? "Layered motion" : item.id === "pendulum" ? "Back and forth" : item.id === "drift" ? "Soft movement" : "Flowing motion"}</small></button>)}</div></div>
     <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => onModeChange(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option><option value="vocal">Vocal clarity</option><option value="club">Club energy</option><option value="cinematic">Cinematic space</option><option value="acoustic">Acoustic natural</option><option value="bright">Bright detail</option><option value="chill">Chill flow</option><option value="focus">Focus / balanced</option><option value="vintage">Vintage warmth</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
