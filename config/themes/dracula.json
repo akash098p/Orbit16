@@ -1,1 +1,14 @@
-{"name":"Dracula","mode":"dark","colors":{"background":"#282A36","panel":"#21222C","panel_secondary":"#343746","border":"#44475A","text":"#F8F8F2","muted":"#A9ACBC","accent":"#BD93F9","accent_secondary":"#8BE9FD"}}
+{
+  "name": "Dracula",
+  "mode": "dark",
+  "colors": {
+    "background": "#282A36",
+    "panel": "#21222C",
+    "panel_secondary": "#343746",
+    "border": "#44475A",
+    "text": "#F8F8F2",
+    "muted": "#A9ACBC",
+    "accent": "#BD93F9",
+    "accent_secondary": "#8BE9FD"
+  }
+}
