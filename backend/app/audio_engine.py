@@ -29,10 +29,10 @@ def process_audio(
     audio: np.ndarray,
     sample_rate: int,
     *,
-    movement_depth: float = 0.65,
-    movement_rate: float = 0.12,
-    stereo_width: float = 1.20,
-    reverb_mix: float = 0.12,
+    movement_depth: float = 0.32,
+    movement_rate: float = 0.08,
+    stereo_width: float = 1.08,
+    reverb_mix: float = 0.06,
     output_ceiling_db: float = -1.0,
     movement_enabled: bool = True,
     width_enabled: bool = True,
@@ -88,8 +88,8 @@ def process_audio(
         alpha = 1.0 - np.exp(-1.0 / (sample_rate * 0.012))
         pan = lfilter([alpha], [1.0, -(1.0 - alpha)], raw_pan).astype(np.float32)
         angle = (pan + 1.0) * (np.pi / 4.0)
-        output[:, 0] *= (np.sqrt(2.0) * np.cos(angle)).astype(np.float32)
-        output[:, 1] *= (np.sqrt(2.0) * np.sin(angle)).astype(np.float32)
+        output[:, 0] *= np.cos(angle).astype(np.float32)
+        output[:, 1] *= np.sin(angle).astype(np.float32)
 
     if bass_gain_db != 0 or treble_gain_db != 0:
         eq = []
