@@ -87,9 +87,16 @@ def process_audio(
         # retaining the intentionally slow, continuous orbit motion.
         alpha = 1.0 - np.exp(-1.0 / (sample_rate * 0.012))
         pan = lfilter([alpha], [1.0, -(1.0 - alpha)], raw_pan).astype(np.float32)
-        angle = (pan + 1.0) * (np.pi / 4.0)
-        output[:, 0] *= np.cos(angle).astype(np.float32)
-        output[:, 1] *= np.sin(angle).astype(np.float32)
+        angle = np.abs(pan) * (np.pi / 4.0)
+        direct = np.cos(angle).astype(np.float32)
+        cross = np.sin(angle).astype(np.float32)
+        left = output[:, 0].copy()
+        right = output[:, 1].copy()
+        output[:, 0] = left * direct + right * cross
+        output[:, 1] = right * direct + left * cross
+        norm = np.maximum(direct + cross, 1.0)
+        output[:, 0] /= norm
+        output[:, 1] /= norm
 
     if bass_gain_db != 0 or treble_gain_db != 0:
         eq = []
