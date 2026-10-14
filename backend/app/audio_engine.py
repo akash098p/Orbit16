@@ -1,4 +1,5 @@
 """Offline stereo DSP engine with oversampled peak protection."""
+
 import numpy as np
 from pedalboard import HighShelfFilter, LowShelfFilter, Pedalboard, Reverb
 from scipy.signal import lfilter, resample_poly
@@ -81,7 +82,9 @@ def process_audio(
         left, right = output[:, 0], output[:, 1]
         mid = (left + right) * 0.5
         side = (left - right) * 0.5
-        output = np.column_stack((mid + side * stereo_width, mid - side * stereo_width)).astype(np.float32, copy=False)
+        output = np.column_stack(
+            (mid + side * stereo_width, mid - side * stereo_width)
+        ).astype(np.float32, copy=False)
 
     if movement_enabled and movement_depth > 0:
         time = np.arange(len(output), dtype=np.float64) / sample_rate
@@ -94,7 +97,11 @@ def process_audio(
         elif motion_pattern == "pendulum":
             motion = np.sin(phase)
         elif motion_pattern == "drift":
-            motion = 0.72 * np.sin(phase) + 0.18 * np.sin(phase * 0.37 + 0.8) + 0.10 * np.sin(phase * 0.19)
+            motion = (
+                0.72 * np.sin(phase)
+                + 0.18 * np.sin(phase * 0.37 + 0.8)
+                + 0.10 * np.sin(phase * 0.19)
+            )
         else:  # Lissajous-like smooth cross modulation projected onto the stereo pan axis.
             motion = np.sin(phase) * np.cos(phase * 0.5)
         raw_pan = movement_depth * motion
@@ -122,7 +129,17 @@ def process_audio(
         output = Pedalboard(eq)(output.T, sample_rate=sample_rate).T.astype(np.float32)
 
     if reverb_enabled and reverb_mix > 0:
-        effects = Pedalboard([Reverb(room_size=0.55, damping=0.5, wet_level=reverb_mix, dry_level=1.0, width=1.0)])
+        effects = Pedalboard(
+            [
+                Reverb(
+                    room_size=0.55,
+                    damping=0.5,
+                    wet_level=reverb_mix,
+                    dry_level=1.0,
+                    width=1.0,
+                )
+            ]
+        )
         output = effects(output.T, sample_rate=sample_rate).T.astype(np.float32)
 
     ceiling = 10.0 ** (output_ceiling_db / 20.0)

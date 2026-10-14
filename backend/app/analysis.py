@@ -1,4 +1,5 @@
 """Objective stereo and loudness measurements for processed audio."""
+
 from __future__ import annotations
 
 import math
@@ -25,14 +26,20 @@ def analyze_audio(audio: np.ndarray, sample_rate: int) -> dict[str, float | None
     left_energy = float(np.dot(left, left))
     right_energy = float(np.dot(right, right))
     denominator = math.sqrt(left_energy * right_energy)
-    correlation = float(np.dot(left, right) / denominator) if denominator > 1e-20 else None
+    correlation = (
+        float(np.dot(left, right) / denominator) if denominator > 1e-20 else None
+    )
     if correlation is not None:
         correlation = max(-1.0, min(1.0, correlation))
 
     stereo_rms = math.sqrt((left_energy + right_energy) / (2.0 * len(samples)))
     mono = (left + right) * 0.5
     mono_rms = float(np.sqrt(np.mean(mono * mono)))
-    mono_fold_db = 20.0 * math.log10(mono_rms / stereo_rms) if mono_rms > 0 and stereo_rms > 0 else None
+    mono_fold_db = (
+        20.0 * math.log10(mono_rms / stereo_rms)
+        if mono_rms > 0 and stereo_rms > 0
+        else None
+    )
 
     loudness = None
     try:
@@ -46,6 +53,10 @@ def analyze_audio(audio: np.ndarray, sample_rate: int) -> dict[str, float | None
     return {
         "integrated_lufs": round(loudness, 2) if loudness is not None else None,
         "true_peak_dbtp": round(true_peak_db, 2) if true_peak_db is not None else None,
-        "stereo_correlation": round(correlation, 3) if correlation is not None else None,
-        "mono_fold_down_db": round(mono_fold_db, 2) if mono_fold_db is not None else None,
+        "stereo_correlation": (
+            round(correlation, 3) if correlation is not None else None
+        ),
+        "mono_fold_down_db": (
+            round(mono_fold_db, 2) if mono_fold_db is not None else None
+        ),
     }

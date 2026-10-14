@@ -1,10 +1,12 @@
 """Paths and runtime settings."""
+
 from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 def positive_int(name: str, default: int) -> int:
     raw = os.getenv(name, "").strip()
@@ -17,6 +19,7 @@ def positive_int(name: str, default: int) -> int:
     if value < 1:
         raise ValueError(f"{name} must be greater than zero.")
     return value
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -32,7 +35,11 @@ class Settings:
     @property
     def home(self) -> Path:
         configured = os.getenv("ORBIT16_HOME", "").strip()
-        return Path(configured).expanduser().resolve() if configured else self.project_root / "data"
+        return (
+            Path(configured).expanduser().resolve()
+            if configured
+            else self.project_root / "data"
+        )
 
     @property
     def temp_dir(self) -> Path:
@@ -49,5 +56,6 @@ class Settings:
     def ensure_runtime_dirs(self) -> None:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+
 
 settings = Settings()
