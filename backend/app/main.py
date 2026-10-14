@@ -3,6 +3,7 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
+import subprocess
 from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -10,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 from app.audio_engine import process_audio
 from app.analysis import analyze_audio
-from app.audio_io import AudioDecodeError, SUPPORTED_EXTENSIONS, decode_to_float_wav, read_float_wav, write_24bit_wav
+from app.audio_io import AudioDecodeError, SUPPORTED_EXTENSIONS, decode_to_float_wav, read_float_wav, write_24bit_wav, require_ffmpeg
 from app.config import settings
 from app.logging_config import configure_logging
 
@@ -78,6 +79,53 @@ async def convert(
         shutil.rmtree(job_dir, ignore_errors=True)
         logger.exception("Unexpected conversion failure")
         raise HTTPException(status_code=500, detail="Audio conversion failed unexpectedly.")
+    finally:
+        await file.close()
+
+
+@app.post("/api/encode")
+async def encode_live_mix(
+    file: Annotated[UploadFile, File(description="Rendered live mix WAV")],
+    bitrate: Annotated[int, Form(ge=128, le=320)] = 192,
+):
+    """Encode a rendered browser live mix to compact MP3 using local FFmpeg."""
+    settings.ensure_runtime_dirs()
+    job_dir = Path(tempfile.mkdtemp(prefix="encode_", dir=settings.temp_dir))
+    source, output = job_dir / "live_mix.wav", job_dir / "live_mix.mp3"
+    try:
+        if Path(file.filename or "").suffix.lower() not in {".wav", ".wave"}:
+            raise HTTPException(status_code=415, detail="Live mix must be uploaded as a WAV file.")
+        total = 0
+        with source.open("wb") as target:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > settings.max_upload_bytes:
+                    raise HTTPException(status_code=413, detail=f"Maximum upload size is {settings.max_upload_bytes // (1024 * 1024)} MB.")
+                target.write(chunk)
+        if total == 0:
+            raise HTTPException(status_code=400, detail="Rendered mix is empty.")
+        try:
+            subprocess.run(
+                [require_ffmpeg(), "-nostdin", "-hide_banner", "-v", "error", "-y",
+                 "-i", str(source), "-vn", "-codec:a", "libmp3lame", "-b:a", f"{bitrate}k",
+                 "-write_xing", "1", str(output)],
+                check=True, capture_output=True, timeout=300,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=408, detail="MP3 encoding timed out.") from exc
+        except subprocess.CalledProcessError as exc:
+            detail = exc.stderr.decode("utf-8", errors="replace").strip()
+            raise HTTPException(status_code=500, detail=detail[-500:] or "MP3 encoding failed.") from exc
+        return FileResponse(
+            path=str(output), media_type="audio/mpeg", filename="orbit16_live_mix.mp3",
+            background=BackgroundTask(shutil.rmtree, str(job_dir), ignore_errors=True),
+        )
+    except HTTPException:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
     finally:
         await file.close()
 
