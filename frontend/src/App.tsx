@@ -77,7 +77,7 @@ function SourcePreview({ file }: { file: File }) {
   return <audio controls preload="metadata" src={url || undefined}/>;
 }
 
-type LiveMode = "studio" | "orbit" | "wide" | "bass" | "dream" | "night";
+type LiveMode = "studio" | "orbit" | "wide" | "bass" | "dream" | "night" | "vocal" | "club" | "cinematic" | "acoustic" | "bright" | "chill" | "focus" | "vintage";
 type LiveExport = { mode: LiveMode; bass: number; treble: number; pattern: MotionPattern };
 type MotionPattern = "orbit" | "spiral" | "pendulum" | "drift" | "lissajous";
 const motionPatterns: { id: MotionPattern; label: string; detail: string; wave: OscillatorType }[] = [
@@ -173,6 +173,14 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
       bass: { pan: 0, rate: 0, bass: 5, treble: -1 },
       dream: { pan: settings.movement_enabled ? settings.movement_depth * 0.7 : 0, rate: settings.movement_rate * 0.7, bass: 2, treble: 2 },
       night: { pan: 0, rate: 0, bass: 2, treble: -5 },
+      vocal: { pan: 0, rate: 0, bass: -1, treble: 2.5 },
+      club: { pan: settings.movement_enabled ? settings.movement_depth * 0.18 : 0, rate: settings.movement_rate * 0.65, bass: 4, treble: 1.5 },
+      cinematic: { pan: settings.movement_enabled ? settings.movement_depth * 0.55 : 0, rate: settings.movement_rate * 0.45, bass: 1.5, treble: 1.5 },
+      acoustic: { pan: 0, rate: 0, bass: 0.5, treble: 1.5 },
+      bright: { pan: 0, rate: 0, bass: -1, treble: 4 },
+      chill: { pan: settings.movement_enabled ? settings.movement_depth * 0.3 : 0, rate: settings.movement_rate * 0.35, bass: 1.5, treble: -0.5 },
+      focus: { pan: 0, rate: 0, bass: -1, treble: 1 },
+      vintage: { pan: 0, rate: 0, bass: 2, treble: -2.5 },
     };
     const profile = profiles[mode];
     if (bassRef.current) bassRef.current.gain.setTargetAtTime(profile.bass + bass, ctx.currentTime, 0.04);
@@ -286,7 +294,7 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
     <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { if (recording) stopRecording(); stopLive(true); setMessage("Stopped."); }}>Stop</button>{!recording ? <button className="secondary-button" type="button" disabled={!playing} onClick={startRecording}>● Record mix</button> : <button className="secondary-button recording-button" type="button" onClick={stopRecording}>■ Stop recording</button>}{recordedBlob && <button className="secondary-button" type="button" onClick={downloadRecording}>↓ Download mix</button>}<span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
     <input className="range live-seek" aria-label="Live playback position" type="range" min={0} max={Math.max(duration, 0.1)} step={0.1} value={Math.min(position, duration || 0)} disabled={!duration} onChange={e => seekLive(Number(e.target.value))}/>
     <div className="motion-patterns" aria-label="Spatial motion pattern"><div className="motion-pattern-head"><strong>Spatial motion</strong><span>{selectedMotion.detail}</span></div><div className="motion-pattern-grid">{motionPatterns.map(item => <button key={item.id} type="button" className={`motion-pattern ${pattern === item.id ? "active" : ""}`} aria-pressed={pattern === item.id} onClick={() => setPattern(item.id)}><span className={`pattern-glyph glyph-${item.id}`} aria-hidden="true"><i/></span><strong>{item.label}</strong><small>{item.id === "orbit" ? "Circular sweep" : item.id === "spiral" ? "Layered motion" : item.id === "pendulum" ? "Back and forth" : item.id === "drift" ? "Soft movement" : "Flowing motion"}</small></button>)}</div></div>
-    <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => onModeChange(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
+    <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => onModeChange(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option><option value="vocal">Vocal clarity</option><option value="club">Club energy</option><option value="cinematic">Cinematic space</option><option value="acoustic">Acoustic natural</option><option value="bright">Bright detail</option><option value="chill">Chill flow</option><option value="focus">Focus / balanced</option><option value="vintage">Vintage warmth</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
     <div className="live-eq"><div><span>BASS</span><strong>{bass > 0 ? "+" : ""}{bass} dB</strong><input className="range" aria-label="Live bass EQ" type="range" min={-12} max={12} step={1} value={bass} onChange={e => setBass(Number(e.target.value))}/></div><div><span>TREBLE</span><strong>{treble > 0 ? "+" : ""}{treble} dB</strong><input className="range" aria-label="Live treble EQ" type="range" min={-12} max={12} step={1} value={treble} onChange={e => setTreble(Number(e.target.value))}/></div></div>
     <p className="live-message" role="status">{message}</p>
     <p className="analysis-note">Motion patterns and listening modes affect live audition. Offline WAV export uses the processing controls in Sound Design. Record Mix remains available when you want to capture a specific section.</p>
@@ -387,6 +395,14 @@ export default function App() {
           bass: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: Math.max(settings.stereo_width, 1), reverb_mix: Math.min(settings.reverb_mix, 0.06) }, bass: 5, treble: -1 },
           dream: { settings: { movement_depth: settings.movement_enabled ? settings.movement_depth * 0.7 : 0, movement_rate: settings.movement_rate * 0.7, stereo_width: Math.max(settings.stereo_width, 1.15), reverb_mix: Math.max(settings.reverb_mix, 0.08) }, bass: 2, treble: 2 },
           night: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: Math.max(settings.stereo_width, 1), reverb_mix: Math.min(settings.reverb_mix, 0.05) }, bass: 2, treble: -5 },
+          vocal: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: 1.05, reverb_mix: Math.min(settings.reverb_mix, 0.04) }, bass: -1, treble: 2.5 },
+          club: { settings: { movement_depth: settings.movement_enabled ? settings.movement_depth * 0.18 : 0, movement_rate: settings.movement_rate * 0.65, stereo_width: Math.max(settings.stereo_width, 1.12), reverb_mix: Math.min(settings.reverb_mix, 0.06) }, bass: 4, treble: 1.5 },
+          cinematic: { settings: { movement_depth: settings.movement_enabled ? settings.movement_depth * 0.55 : 0, movement_rate: settings.movement_rate * 0.45, stereo_width: Math.max(settings.stereo_width, 1.25), reverb_mix: Math.max(settings.reverb_mix, 0.12) }, bass: 1.5, treble: 1.5 },
+          acoustic: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: 1.02, reverb_mix: Math.min(settings.reverb_mix, 0.03) }, bass: 0.5, treble: 1.5 },
+          bright: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: Math.max(settings.stereo_width, 1), reverb_mix: Math.min(settings.reverb_mix, 0.04) }, bass: -1, treble: 4 },
+          chill: { settings: { movement_depth: settings.movement_enabled ? settings.movement_depth * 0.3 : 0, movement_rate: settings.movement_rate * 0.35, stereo_width: Math.max(settings.stereo_width, 1.08), reverb_mix: Math.max(settings.reverb_mix, 0.05) }, bass: 1.5, treble: -0.5 },
+          focus: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: 1.02, reverb_mix: Math.min(settings.reverb_mix, 0.03) }, bass: -1, treble: 1 },
+          vintage: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: 1.03, reverb_mix: Math.min(settings.reverb_mix, 0.04) }, bass: 2, treble: -2.5 },
         };
         const profile = exportProfiles[liveExport.mode];
         Object.assign(exportSettings, profile.settings);
