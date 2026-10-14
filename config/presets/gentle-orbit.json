@@ -1,1 +1,11 @@
-{"name":"Gentle Orbit","description":"Subtle movement with light ambience.","settings":{"movement_depth":0.28,"movement_rate":0.08,"stereo_width":1.08,"reverb_mix":0.07,"output_ceiling_db":-1.0}}
+{
+  "name": "Gentle Orbit",
+  "description": "Subtle movement with light ambience.",
+  "settings": {
+    "movement_depth": 0.28,
+    "movement_rate": 0.08,
+    "stereo_width": 1.08,
+    "reverb_mix": 0.07,
+    "output_ceiling_db": -1.0
+  }
+}
