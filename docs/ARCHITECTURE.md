@@ -1,6 +1,7 @@
 # Architecture
 
 ## Runtime
+
 - React + TypeScript + Vite provides the browser UI and production build.
 - FastAPI + Uvicorn provides a local loopback API.
 - NumPy and Pedalboard provide offline stereo DSP.
@@ -8,6 +9,7 @@
 - pywebview hosts the shared web UI in the Windows desktop wrapper.
 
 ## Data flow
+
 1. The browser sends an audio file to POST /api/convert.
 2. The API streams uploads to a managed temporary directory with a byte cap.
 3. FFmpeg decodes locally; duration and channel count are checked.
@@ -16,6 +18,7 @@
 6. A new 24-bit WAV is returned; temporary job files are removed after response delivery.
 
 ## Limitations
+
 - “16D” is a creative label; this engine modifies two-channel stereo.
 - Processing operates on a full decoded track in memory and limits duration.
 - Peak attenuation is not a look-ahead or true-peak limiter.
@@ -24,6 +27,7 @@
 - The initial UI uses system font fallbacks to avoid runtime font requests.
 
 ## Security
+
 - Bind only to 127.0.0.1; do not expose the API to a LAN or public internet.
 - Do not accept arbitrary file paths or FFmpeg arguments from users.
 - Uploads are streamed and capped; files live in managed temporary directories.
