@@ -13,6 +13,19 @@ Offline-first stereo spatial audio effects for Windows desktop and a local brows
 
 The app is an offline-first creative stereo effect; it does not generate discrete object-based 3D audio. The peak stage is static gain reduction, not a look-ahead limiter or loudness normalizer.
 
+## Live Sound Lab exports
+
+The Live Sound Lab includes a direct **Download live mix** action, separate from **Record mix**:
+
+- **MP3 · compact** — encode the rendered live mix at 128, 192 or 320 kbps.
+- **WAV · lossless** — download the rendered mix as uncompressed 16-bit PCM WAV.
+- The browser renders the selected live mode, motion pattern and bass/treble settings before export. MP3 compression is performed locally by the FastAPI backend with FFmpeg.
+- If the backend or MP3 encoder is unavailable, the export flow falls back to downloading the rendered WAV where possible. WAV files are much larger than MP3 files.
+
+For MP3 export, keep the local API running on `127.0.0.1:8000` and make sure FFmpeg is installed and available on `PATH`. Check the API at [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health). If MP3 export fails, inspect the backend terminal and run `ffmpeg -version` in PowerShell.
+
+Note: the direct live-mix renderer is a browser-side rendering of the selected live mode and its supported EQ/motion controls; it is not guaranteed to reproduce every effect in the separate full offline DSP conversion pipeline.
+
 ## Requirements
 
 - Windows 10/11 x64 for desktop packaging
