@@ -39,6 +39,7 @@ def process_audio(
     reverb_enabled: bool = True,
     bass_gain_db: float = 0.0,
     treble_gain_db: float = 0.0,
+    motion_pattern: str = "orbit",
 ) -> np.ndarray:
     """Process mono/stereo samples shaped as frames x channels.
 
@@ -56,6 +57,8 @@ def process_audio(
         raise ValueError("stereo_width must be between 0 and 2.")
     if not 0 <= reverb_mix <= 0.5:
         raise ValueError("reverb_mix must be between 0 and 0.5.")
+    if motion_pattern not in {"orbit", "spiral", "pendulum", "drift", "lissajous"}:
+        raise ValueError("Unsupported motion_pattern.")
     if not -12 <= bass_gain_db <= 12 or not -12 <= treble_gain_db <= 12:
         raise ValueError("Bass and treble gain must be between -12 and 12 dB.")
     if not -12 <= output_ceiling_db <= -0.1:
@@ -82,7 +85,19 @@ def process_audio(
 
     if movement_enabled and movement_depth > 0:
         time = np.arange(len(output), dtype=np.float64) / sample_rate
-        raw_pan = movement_depth * np.sin(2 * np.pi * movement_rate * time)
+        phase = 2 * np.pi * movement_rate * time
+        if motion_pattern == "orbit":
+            motion = np.sin(phase)
+        elif motion_pattern == "spiral":
+            # Soft asymmetric sweep, with no sudden pan jumps.
+            motion = 0.72 * np.sin(phase) + 0.28 * np.sin(phase * 0.5)
+        elif motion_pattern == "pendulum":
+            motion = np.sin(phase)
+        elif motion_pattern == "drift":
+            motion = 0.72 * np.sin(phase) + 0.18 * np.sin(phase * 0.37 + 0.8) + 0.10 * np.sin(phase * 0.19)
+        else:  # Lissajous-like smooth cross modulation projected onto the stereo pan axis.
+            motion = np.sin(phase) * np.cos(phase * 0.5)
+        raw_pan = movement_depth * motion
         # A short one-pole smoother prevents abrupt control transitions while
         # retaining the intentionally slow, continuous orbit motion.
         alpha = 1.0 - np.exp(-1.0 / (sample_rate * 0.012))
