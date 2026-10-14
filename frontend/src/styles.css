@@ -164,3 +164,18 @@ footer{border-top:1px solid var(--border);margin-top:34px;padding-top:18px;font-
 .coach-values{font:10px 'DM Mono',monospace;color:var(--accent);line-height:1.6}
 @media(max-width:900px){.recipe-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.recipe-grid{grid-template-columns:1fr}.quick-create-heading{flex-direction:column}.quick-tip{white-space:normal}}
+
+
+/* Compact, structured source picker */
+.drop-zone{min-height:88px!important;padding:15px 150px 15px 58px!important;display:flex;align-items:flex-start;justify-content:center;gap:5px;border-radius:13px!important}
+.upload-icon{position:absolute;left:17px;top:50%;transform:translateY(-50%);width:28px!important;height:28px!important;border-radius:9px!important;font-size:16px!important}
+.drop-main{font-size:12px!important;line-height:1.45}
+.drop-sub{font-size:10px!important;line-height:1.45;max-width:100%;overflow-wrap:anywhere}
+.browse-button{top:50%!important;right:15px!important;transform:translateY(-50%);padding:9px 12px!important;border-radius:9px!important;font-size:11px!important;white-space:nowrap}
+.drop-zone:hover .browse-button{border-color:var(--accent)}
+@media(max-width:680px){
+ .drop-zone{min-height:104px!important;padding:16px 12px 42px 48px!important;align-items:flex-start}
+ .upload-icon{left:12px;top:20px;transform:none}
+ .browse-button{top:auto!important;bottom:10px!important;right:12px!important;transform:none}
+ .drop-sub{padding-right:0}
+}
