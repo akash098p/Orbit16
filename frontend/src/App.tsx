@@ -78,7 +78,7 @@ function SourcePreview({ file }: { file: File }) {
 }
 
 type LiveMode = "studio" | "orbit" | "wide" | "bass" | "dream" | "night";
-type LiveExport = { mode: LiveMode; bass: number; treble: number };
+type LiveExport = { mode: LiveMode; bass: number; treble: number; pattern: MotionPattern };
 type MotionPattern = "orbit" | "spiral" | "pendulum" | "drift" | "lissajous";
 const motionPatterns: { id: MotionPattern; label: string; detail: string; wave: OscillatorType }[] = [
   { id: "orbit", label: "Orbit", detail: "Smooth left ↔ right motion", wave: "sine" },
@@ -94,7 +94,7 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
   const [bass, setBass] = useState(0);
   const [treble, setTreble] = useState(0);
   const selectedMotion = motionPatterns.find(item => item.id === pattern) ?? motionPatterns[0];
-  useEffect(() => { onExportChange({ mode, bass, treble }); }, [mode, bass, treble, onExportChange]);
+  useEffect(() => { onExportChange({ mode, bass, treble, pattern }); }, [mode, bass, treble, pattern, onExportChange]);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState(0);
@@ -300,7 +300,7 @@ function Control({ title, subtitle, value, label, min, max, step, onChange }: { 
 export default function App() {
   const [files, setFiles] = useState<File[]>([]);
   const [liveMode, setLiveMode] = useState<LiveMode>("orbit");
-  const [liveExport, setLiveExport] = useState<LiveExport>({ mode: "orbit", bass: 0, treble: 0 });
+  const [liveExport, setLiveExport] = useState<LiveExport>({ mode: "orbit", bass: 0, treble: 0, pattern: "orbit" });
   const [settings, setSettings] = useState<Settings>(() => {
     try { return { ...initialSettings, ...JSON.parse(localStorage.getItem("orbit16.settings") || "{}") }; } catch { return initialSettings; }
   });
@@ -379,18 +379,21 @@ export default function App() {
         const controller = new AbortController(); abortRef.current = controller;
         const body = new FormData(); body.append("file", source);
         const exportSettings = { ...settings };
-        const exportProfiles: Record<LiveMode, Partial<Settings>> = {
-          studio: { movement_depth: 0, movement_enabled: false, stereo_width: 1, reverb_mix: 0, width_enabled: false, reverb_enabled: false },
-          orbit: { movement_depth: Math.min(0.38, settings.movement_depth), movement_rate: Math.min(0.10, settings.movement_rate), stereo_width: Math.min(1.15, settings.stereo_width), reverb_mix: Math.min(0.08, settings.reverb_mix) },
-          wide: { movement_depth: Math.min(0.16, settings.movement_depth * 0.35), movement_rate: Math.max(0.02, settings.movement_rate * 0.7), stereo_width: 1.35, reverb_mix: 0.06 },
-          bass: { movement_depth: 0, movement_enabled: false, stereo_width: 1.05, reverb_mix: 0.03 },
-          dream: { movement_depth: Math.min(0.35, settings.movement_depth * 0.65), movement_rate: Math.max(0.02, settings.movement_rate * 0.65), stereo_width: 1.22, reverb_mix: 0.12 },
-          night: { movement_depth: 0.08, movement_rate: 0.05, stereo_width: 1.05, reverb_mix: 0.04 },
+        // Match the live audition profile, then layer the Sound Design controls on top.
+        const exportProfiles: Record<LiveMode, { settings: Partial<Settings>; bass: number; treble: number }> = {
+          studio: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: 1, reverb_mix: 0, width_enabled: false, reverb_enabled: false }, bass: 0, treble: 0 },
+          orbit: { settings: { movement_depth: settings.movement_depth, movement_rate: settings.movement_rate }, bass: 0, treble: 0 },
+          wide: { settings: { movement_depth: settings.movement_enabled ? settings.movement_depth * 0.25 : 0, movement_rate: settings.movement_rate * 0.5, stereo_width: Math.max(settings.stereo_width, 1.2) }, bass: 0, treble: 1.5 },
+          bass: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: Math.max(settings.stereo_width, 1), reverb_mix: Math.min(settings.reverb_mix, 0.06) }, bass: 5, treble: -1 },
+          dream: { settings: { movement_depth: settings.movement_enabled ? settings.movement_depth * 0.7 : 0, movement_rate: settings.movement_rate * 0.7, stereo_width: Math.max(settings.stereo_width, 1.15), reverb_mix: Math.max(settings.reverb_mix, 0.08) }, bass: 2, treble: 2 },
+          night: { settings: { movement_depth: 0, movement_enabled: false, stereo_width: Math.max(settings.stereo_width, 1), reverb_mix: Math.min(settings.reverb_mix, 0.05) }, bass: 2, treble: -5 },
         };
-        Object.assign(exportSettings, exportProfiles[liveExport.mode]);
+        const profile = exportProfiles[liveExport.mode];
+        Object.assign(exportSettings, profile.settings);
         Object.entries(exportSettings).forEach(([key, value]) => body.append(key, String(value)));
-        body.append("bass_gain_db", String(liveExport.bass));
-        body.append("treble_gain_db", String(liveExport.treble));
+        body.append("bass_gain_db", String(Math.max(-12, Math.min(12, profile.bass + liveExport.bass))));
+        body.append("treble_gain_db", String(Math.max(-12, Math.min(12, profile.treble + liveExport.treble))));
+        body.append("motion_pattern", liveExport.pattern);
         const response = await fetch("/api/convert", { method: "POST", body, signal: controller.signal });
         if (!response.ok) {
           let message = `Conversion failed (${response.status})`;
