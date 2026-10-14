@@ -227,6 +227,77 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
     }, 100);
   }
 
+  async function downloadProcessedMix() {
+    const buffer = bufferRef.current;
+    if (!buffer) { setMessage("Choose a track and wait for it to finish preparing."); return; }
+    setMessage("Rendering your current live mix for download…");
+    try {
+      const profiles: Record<LiveMode, { pan: number; rate: number; bass: number; treble: number }> = {
+        studio: { pan: 0, rate: 0, bass: 0, treble: 0 },
+        orbit: { pan: settings.movement_enabled ? settings.movement_depth : 0, rate: settings.movement_rate, bass: 0, treble: 0 },
+        wide: { pan: settings.movement_enabled ? settings.movement_depth * 0.25 : 0, rate: settings.movement_rate * 0.5, bass: 0, treble: 1.5 },
+        bass: { pan: 0, rate: 0, bass: 5, treble: -1 },
+        dream: { pan: settings.movement_enabled ? settings.movement_depth * 0.7 : 0, rate: settings.movement_rate * 0.7, bass: 2, treble: 2 },
+        night: { pan: 0, rate: 0, bass: 2, treble: -5 },
+        vocal: { pan: 0, rate: 0, bass: -1, treble: 2.5 },
+        club: { pan: settings.movement_enabled ? settings.movement_depth * 0.18 : 0, rate: settings.movement_rate * 0.65, bass: 4, treble: 1.5 },
+        cinematic: { pan: settings.movement_enabled ? settings.movement_depth * 0.55 : 0, rate: settings.movement_rate * 0.45, bass: 1.5, treble: 1.5 },
+        acoustic: { pan: 0, rate: 0, bass: 0.5, treble: 1.5 },
+        bright: { pan: 0, rate: 0, bass: -1, treble: 4 },
+        chill: { pan: settings.movement_enabled ? settings.movement_depth * 0.3 : 0, rate: settings.movement_rate * 0.35, bass: 1.5, treble: -0.5 },
+        focus: { pan: 0, rate: 0, bass: -1, treble: 1 },
+        vintage: { pan: 0, rate: 0, bass: 2, treble: -2.5 },
+      };
+      const profile = profiles[mode];
+      const OfflineContext = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
+      if (!OfflineContext) throw new Error("Offline audio rendering is not supported in this browser.");
+      const offline = new OfflineContext(2, buffer.length, buffer.sampleRate);
+      const source = offline.createBufferSource(); source.buffer = buffer;
+      const bassFilter = offline.createBiquadFilter(); bassFilter.type = "lowshelf"; bassFilter.frequency.value = 180; bassFilter.gain.value = profile.bass + bass;
+      const trebleFilter = offline.createBiquadFilter(); trebleFilter.type = "highshelf"; trebleFilter.frequency.value = 4500; trebleFilter.gain.value = profile.treble + treble;
+      const pan = offline.createStereoPanner();
+      source.connect(bassFilter); bassFilter.connect(trebleFilter); trebleFilter.connect(pan); pan.connect(offline.destination);
+      if (profile.rate > 0 && profile.pan > 0) {
+        const lfo = offline.createOscillator(); const lfoGain = offline.createGain();
+        lfo.type = selectedMotion.wave; lfo.frequency.value = profile.rate; lfoGain.gain.value = profile.pan;
+        lfo.connect(lfoGain); lfoGain.connect(pan.pan); lfo.start(0); lfo.stop(buffer.duration);
+      }
+      source.start(0);
+      const rendered = await offline.startRendering();
+      const wav = encodeWav(rendered);
+      const url = URL.createObjectURL(wav);
+      const anchor = document.createElement("a");
+      const baseName = file?.name.replace(/\\.[^.]+$/, "") || "audio";
+      anchor.href = url; anchor.download = `${baseName}_orbit16_live_mix.wav`;
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setMessage("Download ready · rendered from the selected live mode, motion pattern and bass/treble settings.");
+    } catch (reason) {
+      setMessage(reason instanceof Error ? `Export failed: ${reason.message}` : "Export failed.");
+    }
+  }
+
+  function encodeWav(buffer: AudioBuffer): Blob {
+    const channels = Math.min(2, buffer.numberOfChannels);
+    const frames = buffer.length;
+    const bytesPerSample = 2;
+    const dataSize = frames * channels * bytesPerSample;
+    const array = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(array);
+    const writeText = (offset: number, value: string) => { for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i)); };
+    writeText(0, "RIFF"); view.setUint32(4, 36 + dataSize, true); writeText(8, "WAVE"); writeText(12, "fmt ");
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true);
+    view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * channels * bytesPerSample, true);
+    view.setUint16(32, channels * bytesPerSample, true); view.setUint16(34, 16, true); writeText(36, "data"); view.setUint32(40, dataSize, true);
+    const channelData = Array.from({ length: channels }, (_, channel) => buffer.getChannelData(channel));
+    let offset = 44;
+    for (let i = 0; i < frames; i++) for (let channel = 0; channel < channels; channel++) {
+      const sample = Math.max(-1, Math.min(1, channelData[channel][i]));
+      view.setInt16(offset, sample < 0 ? sample * 32768 : sample * 32767, true); offset += 2;
+    }
+    return new Blob([array], { type: "audio/wav" });
+  }
+
   function startRecording() {
     const destination = recordDestinationRef.current;
     if (!destination || !playing || typeof MediaRecorder === "undefined") {
@@ -291,7 +362,7 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
   return <section className="live-panel">
     <div className="live-head"><div><div className="eyebrow accent">REAL-TIME AUDITION</div><h3>Live sound lab</h3><p>Browser-native live playback. Change the mode, EQ and level without exporting or reprocessing the track.</p></div><span className={playing ? "live-badge is-live" : "live-badge"}><i/>{playing ? "LIVE" : "READY"}</span></div>
     <div className={`spatial-stage ${playing ? "stage-playing" : ""} pattern-${pattern}`} aria-label={`Stereo field monitor: ${selectedMotion.label}`}><div className="stage-grid"/><div className="stage-axis axis-x"/><div className="stage-axis axis-y"/><div className="stage-scale scale-one"/><div className="stage-scale scale-two"/><div className="stage-scale scale-three"/><div className="stage-ring ring-a"/><div className="stage-ring ring-b"/><div className="stage-ring ring-c"/><div className="stage-trail"/><div className="stage-center"><span/></div><div className="stage-readout readout-top"><span>STEREO FIELD MONITOR</span><strong>{playing ? "SIGNAL ACTIVE" : "SIGNAL STANDBY"}</strong></div><div className="stage-readout readout-left"><span>LEFT</span><strong>−90°</strong><i/></div><div className="stage-readout readout-right"><span>RIGHT</span><strong>+90°</strong><i/></div><div className="stage-readout readout-bottom"><span>MOTION PROFILE</span><strong>{selectedMotion.label.toUpperCase()}</strong><small>{playing ? "PLAYBACK RUNNING" : "AWAITING PLAYBACK"}</small></div><span className="stage-caption">{playing ? "LIVE SIGNAL · STEREO MOTION" : "STEREO MOTION PREVIEW"}</span></div>
-    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { if (recording) stopRecording(); stopLive(true); setMessage("Stopped."); }}>Stop</button>{!recording ? <button className="secondary-button" type="button" disabled={!playing} onClick={startRecording}>● Record mix</button> : <button className="secondary-button recording-button" type="button" onClick={stopRecording}>■ Stop recording</button>}{recordedBlob && <button className="secondary-button" type="button" onClick={downloadRecording}>↓ Download mix</button>}<span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
+    <div className="live-transport"><button className="primary-button" type="button" disabled={!file || loading || !bufferRef.current} onClick={() => playing ? pauseLive() : void playLive()}>{loading ? "Preparing…" : playing ? "Ⅱ Pause" : position > 0 ? "▶ Resume live" : "▶ Play live"}</button><button className="secondary-button" type="button" disabled={!file || loading} onClick={() => { if (recording) stopRecording(); stopLive(true); setMessage("Stopped."); }}>Stop</button>{<button className="secondary-button" type="button" disabled={!file || loading} onClick={() => void downloadProcessedMix()}>↓ Download live mix</button>}{!recording ? <button className="secondary-button" type="button" disabled={!playing} onClick={startRecording}>● Record mix</button> : <button className="secondary-button recording-button" type="button" onClick={stopRecording}>■ Stop recording</button>}{recordedBlob && <button className="secondary-button" type="button" onClick={downloadRecording}>↓ Download mix</button>}<span className="live-time">{position.toFixed(1)} / {duration.toFixed(1)} sec</span></div>
     <input className="range live-seek" aria-label="Live playback position" type="range" min={0} max={Math.max(duration, 0.1)} step={0.1} value={Math.min(position, duration || 0)} disabled={!duration} onChange={e => seekLive(Number(e.target.value))}/>
     <div className="motion-patterns" aria-label="Spatial motion pattern"><div className="motion-pattern-head"><strong>Spatial motion</strong><span>{selectedMotion.detail}</span></div><div className="motion-pattern-grid">{motionPatterns.map(item => <button key={item.id} type="button" className={`motion-pattern ${pattern === item.id ? "active" : ""}`} aria-pressed={pattern === item.id} onClick={() => setPattern(item.id)}><span className={`pattern-glyph glyph-${item.id}`} aria-hidden="true"><i/></span><strong>{item.label}</strong><small>{item.id === "orbit" ? "Circular sweep" : item.id === "spiral" ? "Layered motion" : item.id === "pendulum" ? "Back and forth" : item.id === "drift" ? "Soft movement" : "Flowing motion"}</small></button>)}</div></div>
     <div className="live-modes"><label>Listening mode<select value={mode} onChange={e => onModeChange(e.target.value as LiveMode)}><option value="studio">Studio / neutral</option><option value="orbit">Orbit 16D</option><option value="wide">Wide field</option><option value="bass">Bass focus</option><option value="dream">Dream space</option><option value="night">Night / soft highs</option><option value="vocal">Vocal clarity</option><option value="club">Club energy</option><option value="cinematic">Cinematic space</option><option value="acoustic">Acoustic natural</option><option value="bright">Bright detail</option><option value="chill">Chill flow</option><option value="focus">Focus / balanced</option><option value="vintage">Vintage warmth</option></select></label><label className="live-volume">Monitor level <strong>{Math.round(volume * 100)}%</strong><input className="range" type="range" min={0} max={1} step={0.01} value={volume} onChange={e => setVolume(Number(e.target.value))}/></label></div>
