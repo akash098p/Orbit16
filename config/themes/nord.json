@@ -1,1 +1,14 @@
-{"name":"Nord","mode":"dark","colors":{"background":"#242933","panel":"#2E3440","panel_secondary":"#3B4252","border":"#434C5E","text":"#ECEFF4","muted":"#A3B0C2","accent":"#A3BE8C","accent_secondary":"#88C0D0"}}
+{
+  "name": "Nord",
+  "mode": "dark",
+  "colors": {
+    "background": "#242933",
+    "panel": "#2E3440",
+    "panel_secondary": "#3B4252",
+    "border": "#434C5E",
+    "text": "#ECEFF4",
+    "muted": "#A3B0C2",
+    "accent": "#A3BE8C",
+    "accent_secondary": "#88C0D0"
+  }
+}
