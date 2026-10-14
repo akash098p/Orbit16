@@ -274,14 +274,22 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
         const form = new FormData();
         form.append("file", new File([wav], "orbit16_live_mix.wav", { type: "audio/wav" }));
         form.append("bitrate", mp3Bitrate);
-        const response = await fetch("/api/encode", { method: "POST", body: form });
-        if (!response.ok) {
-          let detail = "MP3 encoding failed.";
-          try { const payload = await response.json(); detail = payload.detail || detail; } catch {}
-          throw new Error(detail);
+        try {
+          const response = await fetch("/api/encode", { method: "POST", body: form });
+          if (!response.ok) {
+            let detail = "MP3 encoding failed.";
+            try { const payload = await response.json(); detail = payload.detail || detail; } catch {}
+            throw new Error(detail);
+          }
+          outputBlob = await response.blob();
+          extension = "mp3";
+        } catch (encodeError) {
+          // Still deliver the rendered mix if the local API/FFmpeg is unavailable.
+          outputBlob = wav;
+          extension = "wav";
+          const reason = encodeError instanceof Error ? encodeError.message : "local MP3 encoding is unavailable";
+          setMessage(`MP3 encoding unavailable (${reason}). Downloading the rendered mix as WAV instead.`);
         }
-        outputBlob = await response.blob();
-        extension = "mp3";
       }
       const url = URL.createObjectURL(outputBlob);
       const anchor = document.createElement("a");
@@ -289,9 +297,11 @@ function LiveAudition({ file, settings, mode, onModeChange, onExportChange }: { 
       anchor.href = url; anchor.download = `${baseName}_orbit16_live_mix.${extension}`;
       document.body.appendChild(anchor); anchor.click(); anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-      setMessage(exportFormat === "mp3"
-        ? `MP3 download ready · ${mp3Bitrate} kbps · encoded locally from your rendered live mix.`
-        : "WAV download ready · rendered from the selected live mode, motion pattern and bass/treble settings.");
+      if (extension === "mp3") {
+        setMessage(`MP3 download ready · ${mp3Bitrate} kbps · encoded locally from your rendered live mix.`);
+      } else if (exportFormat === "wav") {
+        setMessage("WAV download ready · rendered from the selected live mode, motion pattern and bass/treble settings.");
+      }
     } catch (reason) {
       setMessage(reason instanceof Error ? `Export failed: ${reason.message}` : "Export failed.");
     }
