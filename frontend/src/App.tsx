@@ -4,11 +4,11 @@ type Settings = { movement_depth: number; movement_rate: number; stereo_width: n
 type Preset = { name: string; settings: Settings; builtin?: boolean };
 type Completed = { id: string; sourceName: string; outputName: string; url: string; size: number };
 type Analysis = { duration_seconds: number; sample_rate: number; channels: number; metrics: { integrated_lufs: number | null; true_peak_dbtp: number | null; stereo_correlation: number | null; mono_fold_down_db: number | null } };
-const initialSettings: Settings = { movement_depth: 0.65, movement_rate: 0.12, stereo_width: 1.2, reverb_mix: 0.12, output_ceiling_db: -1, movement_enabled: true, width_enabled: true, reverb_enabled: true };
+const initialSettings: Settings = { movement_depth: 0.32, movement_rate: 0.08, stereo_width: 1.08, reverb_mix: 0.06, output_ceiling_db: -1, movement_enabled: true, width_enabled: true, reverb_enabled: true };
 const builtinPresets: Preset[] = [
-  { name: "Gentle Orbit", builtin: true, settings: { ...initialSettings, movement_depth: 0.28, movement_rate: 0.08, stereo_width: 1.08, reverb_mix: 0.07 } },
-  { name: "Deep Space", builtin: true, settings: { ...initialSettings, movement_depth: 0.88, movement_rate: 0.16, stereo_width: 1.55, reverb_mix: 0.2 } },
-  { name: "Wide & Calm", builtin: true, settings: { ...initialSettings, movement_depth: 0.18, movement_rate: 0.06, stereo_width: 1.65, reverb_mix: 0.1 } },
+  { name: "Gentle Orbit", builtin: true, settings: { ...initialSettings, movement_depth: 0.22, movement_rate: 0.07, stereo_width: 1.05, reverb_mix: 0.04 } },
+  { name: "Deep Space", builtin: true, settings: { ...initialSettings, movement_depth: 0.58, movement_rate: 0.11, stereo_width: 1.35, reverb_mix: 0.12 } },
+  { name: "Wide & Calm", builtin: true, settings: { ...initialSettings, movement_depth: 0.14, movement_rate: 0.05, stereo_width: 1.35, reverb_mix: 0.06 } },
 ];
 const fmt = (n: number) => n.toFixed(2);
 const audioAccept = ".wav,.flac,.mp3,.m4a,.aac,.ogg,.opus,.aiff,.aif";
@@ -365,11 +365,11 @@ export default function App() {
         const exportSettings = { ...settings };
         const exportProfiles: Record<LiveMode, Partial<Settings>> = {
           studio: { movement_depth: 0, movement_enabled: false, stereo_width: 1, reverb_mix: 0, width_enabled: false, reverb_enabled: false },
-          orbit: {},
-          wide: { movement_depth: Math.min(1, settings.movement_depth * 0.25), movement_rate: Math.max(0.02, settings.movement_rate * 0.5), stereo_width: 1.75, reverb_mix: 0.1 },
-          bass: { movement_depth: 0, movement_enabled: false, stereo_width: 1.05, reverb_mix: 0.04 },
-          dream: { movement_depth: Math.min(1, settings.movement_depth * 0.7), movement_rate: Math.max(0.02, settings.movement_rate * 0.7), stereo_width: 1.35, reverb_mix: 0.28 },
-          night: { movement_depth: 0.08, movement_rate: 0.06, stereo_width: 1.1, reverb_mix: 0.06 },
+          orbit: { movement_depth: Math.min(0.38, settings.movement_depth), movement_rate: Math.min(0.10, settings.movement_rate), stereo_width: Math.min(1.15, settings.stereo_width), reverb_mix: Math.min(0.08, settings.reverb_mix) },
+          wide: { movement_depth: Math.min(0.16, settings.movement_depth * 0.35), movement_rate: Math.max(0.02, settings.movement_rate * 0.7), stereo_width: 1.35, reverb_mix: 0.06 },
+          bass: { movement_depth: 0, movement_enabled: false, stereo_width: 1.05, reverb_mix: 0.03 },
+          dream: { movement_depth: Math.min(0.35, settings.movement_depth * 0.65), movement_rate: Math.max(0.02, settings.movement_rate * 0.65), stereo_width: 1.22, reverb_mix: 0.12 },
+          night: { movement_depth: 0.08, movement_rate: 0.05, stereo_width: 1.05, reverb_mix: 0.04 },
         };
         Object.assign(exportSettings, exportProfiles[liveExport.mode]);
         Object.entries(exportSettings).forEach(([key, value]) => body.append(key, String(value)));
